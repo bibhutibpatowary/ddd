@@ -1,0 +1,247 @@
+import React, { useState, useMemo, useCallback } from "react";
+import ReactFlow, {
+  Background,
+  Controls,
+  Position
+} from "reactflow";
+import dagre from "dagre";
+import "reactflow/dist/style.css";
+
+/* =========================
+   🔹 DATA
+========================= */
+
+const ALL_NODES = [
+  { id: "product", label: "Product", level: 0 },
+  { id: "patient", label: "Patient", level: 0 },
+  { id: "hcx", label: "HCX", level: 0 },
+
+  { id: "na", label: "NA", level: 1 },
+  { id: "yes", label: "Yes", level: 1 },
+  { id: "no", label: "No", level: 1 },
+
+  { id: "market_insulin", label: "Market - Insulin", level: 2 },
+  { id: "market_niad", label: "Market - NIAD", level: 2 },
+  { id: "market_hgh", label: "Market - HGH", level: 2 },
+
+  { id: "analytics", label: "Enterprise Analytics", level: 3 },
+  { id: "cmr", label: "CMR", level: 3 },
+  { id: "psp", label: "PSP", level: 3 },
+
+  { id: "diabetes", label: "Diabetes", level: 4 },
+  { id: "rare", label: "Rare Disease", level: 4 }
+];
+
+const ALL_EDGES = [
+  { source: "product", target: "na" },
+  { source: "patient", target: "yes" },
+  { source: "hcx", target: "no" },
+
+  { source: "na", target: "market_insulin" },
+  { source: "yes", target: "market_niad" },
+  { source: "no", target: "market_hgh" },
+
+  { source: "yes", target: "market_insulin" },
+  { source: "na", target: "market_niad" },
+
+  { source: "market_insulin", target: "analytics" },
+  { source: "market_insulin", target: "cmr" },
+  { source: "market_niad", target: "psp" },
+
+  { source: "market_hgh", target: "analytics" },
+
+  { source: "analytics", target: "diabetes" },
+  { source: "cmr", target: "rare" },
+  { source: "psp", target: "diabetes" }
+];
+
+/* =========================
+   🔹 LOOKUPS
+========================= */
+
+const nodeMap = new Map(ALL_NODES.map(n => [n.id, n]));
+
+const childrenMap = {};
+const parentMap = {};
+
+ALL_EDGES.forEach(({ source, target }) => {
+  if (!childrenMap[source]) childrenMap[source] = [];
+  if (!parentMap[target]) parentMap[target] = [];
+
+  childrenMap[source].push(target);
+  parentMap[target].push(source);
+});
+
+/* =========================
+   🔹 DAGRE LAYOUT
+========================= */
+
+const getLayoutedElements = (nodes, edges) => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  dagreGraph.setGraph({
+    rankdir: "LR", // left → right
+    nodesep: 80,
+    ranksep: 150
+  });
+
+  nodes.forEach(node => {
+    dagreGraph.setNode(node.id, { width: 150, height: 50 });
+  });
+
+  edges.forEach(edge => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const layoutedNodes = nodes.map(node => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x,
+        y: nodeWithPosition.y
+      }
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+};
+
+/* =========================
+   🔹 GET ALL ANCESTORS
+========================= */
+
+const getAllAncestors = (nodeId, visited = new Set()) => {
+  if (visited.has(nodeId)) return visited;
+  visited.add(nodeId);
+
+  (parentMap[nodeId] || []).forEach(parent => {
+    getAllAncestors(parent, visited);
+  });
+
+  return visited;
+};
+
+/* =========================
+   🔹 COMPONENT
+========================= */
+
+export default function GraphFlow() {
+  const ROOT_NODES = ["product", "patient", "hcx"];
+
+  const [visibleNodeIds, setVisibleNodeIds] = useState(
+    new Set(ROOT_NODES)
+  );
+
+  const [activeNode, setActiveNode] = useState(null);
+
+  /* =========================
+     🔹 BASE NODES
+  ========================= */
+  const baseNodes = useMemo(() => {
+    return Array.from(visibleNodeIds).map(id => ({
+      id,
+      data: { label: nodeMap.get(id).label },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      style: {
+        padding: 10,
+        borderRadius: 8,
+        border:
+          id === activeNode ? "2px solid red" : "1px solid #999",
+        background: id === activeNode ? "#ffeaea" : "#fff"
+      }
+    }));
+  }, [visibleNodeIds, activeNode]);
+
+  /* =========================
+     🔹 EDGES
+  ========================= */
+  const edges = useMemo(() => {
+    return ALL_EDGES.filter(
+      e =>
+        visibleNodeIds.has(e.source) &&
+        visibleNodeIds.has(e.target)
+    ).map(e => ({
+      id: `${e.source}-${e.target}`,
+      source: e.source,
+      target: e.target,
+      type: "smoothstep",
+      animated:
+        activeNode &&
+        (e.source === activeNode || e.target === activeNode),
+      style: {
+        stroke:
+          activeNode &&
+          (e.source === activeNode || e.target === activeNode)
+            ? "red"
+            : "#bbb"
+      }
+    }));
+  }, [visibleNodeIds, activeNode]);
+
+  /* =========================
+     🔹 APPLY DAGRE
+  ========================= */
+  const { nodes } = useMemo(() => {
+    return getLayoutedElements(baseNodes, edges);
+  }, [baseNodes, edges]);
+
+  /* =========================
+     🔹 CLICK HANDLER
+  ========================= */
+  const onNodeClick = useCallback((_, node) => {
+    const children = childrenMap[node.id] || [];
+    const ancestors = getAllAncestors(node.id);
+
+    const newVisible = new Set(ROOT_NODES);
+
+    ancestors.forEach(a => newVisible.add(a));
+    newVisible.add(node.id);
+    children.forEach(c => newVisible.add(c));
+
+    setVisibleNodeIds(newVisible);
+    setActiveNode(node.id);
+  }, []);
+
+  /* =========================
+     🔹 COLUMN HEADERS
+  ========================= */
+  const headers = useMemo(() => {
+    const levels = [...new Set(
+      Array.from(visibleNodeIds).map(id => nodeMap.get(id).level)
+    )];
+
+    return levels.map(level => (
+      <div
+        key={level}
+        style={{
+          position: "absolute",
+          left: level * 200,
+          top: 0,
+          fontWeight: "bold"
+        }}
+      >
+        Level {level}
+      </div>
+    ));
+  }, [visibleNodeIds]);
+
+  /* =========================
+     🔹 RENDER
+  ========================= */
+  return (
+    <div style={{ width: "100%", height: "600px", position: "relative" }}>
+      {headers}
+
+      <ReactFlow nodes={nodes} edges={edges} onNodeClick={onNodeClick} fitView>
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
