@@ -1,41 +1,77 @@
+const [rows, setRows] = useState([]);
+const [selectedDomain, setSelectedDomain] = useState(null);
+
+
+
+
+
+Inside handleUpload:
+
+setRows(cleanData);
+
+
+
+
+
 const onNodeClick = useCallback(
   (_: any, node: any) => {
+    // ❌ prevent clicking last node
     if (isLeafNode(node.id)) return;
 
     const nodeData = nodeMap.get(node.id);
 
+    // 🔥 track domain safely (no async issue)
     let currentDomain = selectedDomain;
 
-    // ✅ If user clicks Domain → set it
     if (nodeData.level === 0) {
-      currentDomain = node.id;
-      setSelectedDomain(node.id);
+      currentDomain = nodeData.label;
+      setSelectedDomain(currentDomain);
     }
 
+    // 🔥 get ancestors
     const ancestors = getAllAncestors(node.id);
 
+    // 🔥 base children (default)
     let children = childrenMap[node.id] || [];
 
-    // 🔥 IMPORTANT FIX (only for Geography level)
+    // 🔥 IMPORTANT FIX → filter when clicking Geography
     if (nodeData.level === 1 && currentDomain) {
-      children = children.filter((childId: any) =>
-        childId.startsWith(`${node.id}|`)
+      const filteredRows = rows.filter(
+        (r: any) =>
+          r.Domain === currentDomain &&
+          r.Geography === nodeData.label
       );
+
+      const validDPs = new Set(
+        filteredRows.map((r: any) => r.DP_Disposition)
+      );
+
+      children = children.filter((childId: any) => {
+        const label = nodeMap.get(childId)?.label;
+        return validDPs.has(label);
+      });
     }
 
+    // 🔥 build visible nodes
     const newVisible: any = new Set();
 
-    // ✅ Always keep Domain visible
+    // ✅ always keep ALL Domain nodes visible
     nodesData.forEach((n: any) => {
       if (n.level === 0) newVisible.add(n.id);
     });
 
-    ancestors.forEach((a) => newVisible.add(a));
+    // ✅ keep ancestors
+    ancestors.forEach((a: any) => newVisible.add(a));
+
+    // ✅ current node
     newVisible.add(node.id);
+
+    // ✅ filtered children
     children.forEach((c: any) => newVisible.add(c));
 
+    // 🔥 update state
     setVisibleNodeIds(newVisible);
     setActiveNode(node.id);
   },
-  [childrenMap, nodeMap, nodesData, selectedDomain]
+  [childrenMap, nodeMap, nodesData, selectedDomain, rows]
 );
