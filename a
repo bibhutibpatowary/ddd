@@ -302,3 +302,18 @@ const ALL_EDGES = Array.from(edgesSet).map((e) => {
 
 console.log(ALL_NODES);
 console.log(ALL_EDGES);
+
+
+
+............
+
+
+
+import * as XLSX from "xlsx";
+
+const workbook = XLSX.readFile("your-file.xlsx");
+const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+const data = XLSX.utils.sheet_to_json(sheet);
+
+console.log(JSON.stringify(data, null, 2));
