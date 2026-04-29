@@ -1,99 +1,33 @@
-const [selectedContext, setSelectedContext] = useState({});
+const [rows, setRows] = useState([]);
+
+const handleFileUpload = (e) => {
+  const file = e.target.files[0];
+
+  const reader = new FileReader();
+
+  reader.onload = (evt) => {
+    const data = new Uint8Array(evt.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+    // 🔥 THIS is your rows
+    setRows(jsonData);
+
+    // (optional) also build nodes/edges here if needed
+  };
+
+  reader.readAsArrayBuffer(file);
+};
 
 
-const onNodeClick = useCallback(
-  (_, node) => {
-    if (isLeafNode(node.id)) return;
 
-    const nodeData = nodeMap.get(node.id);
 
-    let newContext = { ...selectedContext };
 
-    // 🔥 Update context based on level
-    if (nodeData.level === 0) {
-      newContext = { Domain: nodeData.label };
-    }
-
-    if (nodeData.level === 1) {
-      newContext = {
-        ...newContext,
-        Geography: nodeData.label
-      };
-    }
-
-    if (nodeData.level === 2) {
-      newContext = {
-        ...newContext,
-        DP_Disposition: nodeData.label
-      };
-    }
-
-    if (nodeData.level === 3) {
-      newContext = {
-        ...newContext,
-        Data_Platform: nodeData.label
-      };
-    }
-
-    if (nodeData.level === 4) {
-      newContext = {
-        ...newContext,
-        DP_Technology: nodeData.label
-      };
-    }
-
-    if (nodeData.level === 5) {
-      newContext = {
-        ...newContext,
-        System_Disposition: nodeData.label
-      };
-    }
-
-    setSelectedContext(newContext);
-
-    // 🔥 FILTER rows based on context
-    const filteredRows = rows.filter((row) => {
-      return Object.entries(newContext).every(
-        ([key, value]) => row[key] === value
-      );
-    });
-
-    // 🔥 Get next level field
-    const nextLevelMap = {
-      0: "Geography",
-      1: "DP_Disposition",
-      2: "Data_Platform",
-      3: "DP_Technology",
-      4: "System_Disposition",
-      5: row.Source ? "Source" : "Consuming",
-      6: "System_Name"
-    };
-
-    const nextField = nextLevelMap[nodeData.level];
-
-    // 🔥 Build next nodes dynamically
-    const nextNodes = [
-      ...new Set(filteredRows.map((r) => r[nextField]))
-    ].filter(Boolean);
-
-    const newVisible = new Set();
-
-    // ✅ always keep Domain
-    nodesData.forEach((n) => {
-      if (n.level === 0) newVisible.add(n.id);
-    });
-
-    // ✅ keep current node
-    newVisible.add(node.id);
-
-    // ✅ add next nodes
-    nextNodes.forEach((label) => {
-      const id = toId(label);
-      newVisible.add(id);
-    });
-
-    setVisibleNodeIds(newVisible);
-    setActiveNode(node.id);
-  },
-  [rows, selectedContext, nodesData]
-);
+const filteredRows = rows.filter((row) => {
+  return Object.entries(newContext).every(
+    ([key, value]) => row[key] === value
+  );
+});
