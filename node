@@ -1,40 +1,41 @@
-const [rows, setRows] = useState([]);
-const [selectedDomain, setSelectedDomain] = useState(null);
-
-
-
-
-
-Inside handleUpload:
-
-setRows(cleanData);
-
-
+const [selectedPath, setSelectedPath] = useState([]);
 
 
 
 const onNodeClick = useCallback(
   (_: any, node: any) => {
-    // ❌ prevent clicking last node
     if (isLeafNode(node.id)) return;
 
     const nodeData = nodeMap.get(node.id);
 
-    // 🔥 track domain safely (no async issue)
     let currentDomain = selectedDomain;
 
+    // 🔥 if Domain clicked → reset path
     if (nodeData.level === 0) {
       currentDomain = nodeData.label;
       setSelectedDomain(currentDomain);
+      setSelectedPath([node.id]); // start new path
     }
 
-    // 🔥 get ancestors
+    // 🔥 extend path
+    else {
+      setSelectedPath((prev: any) => {
+        const index = prev.indexOf(node.id);
+
+        // if node already exists → trim path (go back)
+        if (index !== -1) {
+          return prev.slice(0, index + 1);
+        }
+
+        return [...prev, node.id];
+      });
+    }
+
     const ancestors = getAllAncestors(node.id);
 
-    // 🔥 base children (default)
     let children = childrenMap[node.id] || [];
 
-    // 🔥 IMPORTANT FIX → filter when clicking Geography
+    // 🔥 FILTER (your previous fix)
     if (nodeData.level === 1 && currentDomain) {
       const filteredRows = rows.filter(
         (r: any) =>
@@ -52,26 +53,48 @@ const onNodeClick = useCallback(
       });
     }
 
-    // 🔥 build visible nodes
     const newVisible: any = new Set();
 
-    // ✅ always keep ALL Domain nodes visible
     nodesData.forEach((n: any) => {
       if (n.level === 0) newVisible.add(n.id);
     });
 
-    // ✅ keep ancestors
     ancestors.forEach((a: any) => newVisible.add(a));
-
-    // ✅ current node
     newVisible.add(node.id);
-
-    // ✅ filtered children
     children.forEach((c: any) => newVisible.add(c));
 
-    // 🔥 update state
     setVisibleNodeIds(newVisible);
     setActiveNode(node.id);
   },
   [childrenMap, nodeMap, nodesData, selectedDomain, rows]
 );
+
+
+
+
+
+const edges = useMemo(() => {
+  return edgesData
+    .filter(
+      (e: any) =>
+        visibleNodeIds.has(e.source) &&
+        visibleNodeIds.has(e.target)
+    )
+    .map((e: any) => {
+      const isPathEdge = selectedPath.some(
+        (nodeId: any, index: number) =>
+          selectedPath[index + 1] === e.target &&
+          nodeId === e.source
+      );
+
+      return {
+        ...e,
+        type: "smoothstep",
+        animated: isPathEdge,
+        style: {
+          stroke: isPathEdge ? "red" : "#bbb",
+          strokeWidth: isPathEdge ? 2.5 : 1
+        }
+      };
+    });
+}, [edgesData, visibleNodeIds, selectedPath]);
