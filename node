@@ -60,3 +60,55 @@ cleanData.forEach((raw) => {
   addEdge(sysDispId, roleId);
   addEdge(roleId, systemId);
 });
+
+
+
+
+........
+
+
+missing node
+
+const domainId = addNode(row.Domain, 0);
+
+// ✅ shared node
+const geoId = addNode(row.Geography, 1);
+
+// from here → scoped
+const dpDispId = addNode(
+  `${geoId}|${row.DP_Disposition}`,
+  2,
+  row.DP_Disposition
+);
+
+const platformId = addNode(
+  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}`,
+  3,
+  row.Data_Platform
+);
+
+const techId = addNode(
+  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}`,
+  4,
+  row.DP_Technology
+);
+
+const sysDispId = addNode(
+  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}`,
+  5,
+  row.System_Disposition
+);
+
+const roleLabel = row.Source ? "Source" : "Consuming";
+
+const roleId = addNode(
+  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}`,
+  6,
+  roleLabel
+);
+
+const systemId = addNode(
+  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}|${row.System_Name}`,
+  7,
+  row.System_Name
+);
