@@ -1,114 +1,52 @@
-cleanData.forEach((raw) => {
-  const row = normalizeRow(raw);
+const [selectedPath, setSelectedPath] = useState([]);
 
-  if (!row.Domain && !row.System_Name) return;
 
-  const domainId = addNode(row.Domain, 0);
+const onNodeClick = useCallback(
+  (_, node) => {
+    if (isLeafNode(node.id)) return;
 
-  const geoId = addNode(
-    `${row.Domain}|${row.Geography}`,
-    1,
-    row.Geography
-  );
+    // 🔥 build path properly
+    let path = [node.id];
+    let current = node.id;
 
-  const dpDispId = addNode(
-    `${row.Domain}|${row.Geography}|${row.DP_Disposition}`,
-    2,
-    row.DP_Disposition
-  );
+    while (parentMap[current] && parentMap[current].length > 0) {
+      const parent = parentMap[current][0]; // selected branch
+      path.unshift(parent);
+      current = parent;
+    }
 
-  const platformId = addNode(
-    `${row.Domain}|${row.Geography}|${row.DP_Disposition}|${row.Data_Platform}`,
-    3,
-    row.Data_Platform
-  );
+    setSelectedPath(path);
 
-  const techId = addNode(
-    `${row.Domain}|${row.Geography}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}`,
-    4,
-    row.DP_Technology
-  );
+    const children = childrenMap[node.id] || [];
 
-  const sysDispId = addNode(
-    `${row.Domain}|${row.Geography}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}`,
-    5,
-    row.System_Disposition
-  );
+    // 🔥 FILTER CHILDREN BASED ON PATH
+    const filteredChildren = children.filter((childId) => {
+      return childId.startsWith(node.id); 
+      // 🔥 works because deeper nodes use path-based IDs
+    });
 
-  const roleLabel = row.Source ? "Source" : row.Consuming ? "Consuming" : "Unknown";
+    const newVisible = new Set();
 
-  const roleId = addNode(
-    `${row.Domain}|${row.Geography}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}`,
-    6,
-    roleLabel
-  );
+    // keep domain always visible
+    nodesData.forEach((n) => {
+      if (n.level === 0) newVisible.add(n.id);
+    });
 
-  const systemName = row.System_Name || "Unknown";
+    path.forEach((p) => newVisible.add(p));
+    filteredChildren.forEach((c) => newVisible.add(c));
 
-  const systemId = addNode(
-    `${row.Domain}|${row.Geography}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}|${systemName}`,
-    7,
-    systemName
-  );
-
-  // edges (same chain)
-  addEdge(domainId, geoId);
-  addEdge(geoId, dpDispId);
-  addEdge(dpDispId, platformId);
-  addEdge(platformId, techId);
-  addEdge(techId, sysDispId);
-  addEdge(sysDispId, roleId);
-  addEdge(roleId, systemId);
-});
+    setVisibleNodeIds(newVisible);
+    setActiveNode(node.id);
+  },
+  [childrenMap, parentMap, nodesData]
+);
 
 
 
 
-........
 
-
-missing node
-
-const domainId = addNode(row.Domain, 0);
-
-// ✅ shared node
-const geoId = addNode(row.Geography, 1);
-
-// from here → scoped
 const dpDispId = addNode(
   `${geoId}|${row.DP_Disposition}`,
   2,
   row.DP_Disposition
-);
-
-const platformId = addNode(
-  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}`,
-  3,
-  row.Data_Platform
-);
-
-const techId = addNode(
-  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}`,
-  4,
-  row.DP_Technology
-);
-
-const sysDispId = addNode(
-  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}`,
-  5,
-  row.System_Disposition
-);
-
-const roleLabel = row.Source ? "Source" : "Consuming";
-
-const roleId = addNode(
-  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}`,
-  6,
-  roleLabel
-);
-
-const systemId = addNode(
-  `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}|${row.System_Name}`,
-  7,
-  row.System_Name
 );
