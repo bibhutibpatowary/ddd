@@ -1,0 +1,71 @@
+import React, { useState } from "react";
+import * as XLSX from "xlsx";
+
+export default function ExcelToJsonFull() {
+  const [jsonData, setJsonData] = useState([]);
+
+  const handleUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const workbook = XLSX.read(event.target.result, {
+        type: "binary"
+      });
+
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+
+      const rawData = XLSX.utils.sheet_to_json(sheet, {
+        defval: "" // ensures no undefined values
+      });
+
+      // 🔥 Clean + format your structure
+      const formatted = rawData.map((row) => ({
+        Domain: row["Domain"],
+        Geography: row["Geography"],
+        DP_Disposition: row["DP_Disposition"],
+        Data_Platform: row["Data_Platform"],
+        DP_Technology: row["DP_Technology"],
+        System_Disposition: row["System_Disposition"],
+        Role: row["Source"]
+          ? "Source"
+          : row["Consuming"]
+          ? "Consuming"
+          : "",
+        System_Name: row["System_Name"]
+      }));
+
+      console.log("FULL JSON:", formatted);
+      setJsonData(formatted);
+
+      // ✅ Auto download full JSON file
+      const blob = new Blob([JSON.stringify(formatted, null, 2)], {
+        type: "application/json"
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "full-data.json";
+      a.click();
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Upload Excel → Get Full JSON</h2>
+
+      <input type="file" accept=".xlsx, .xls" onChange={handleUpload} />
+
+      <h3>Preview (first few rows)</h3>
+      <pre style={{ maxHeight: 300, overflow: "auto" }}>
+        {JSON.stringify(jsonData.slice(0, 10), null, 2)}
+      </pre>
+    </div>
+  );
+}
