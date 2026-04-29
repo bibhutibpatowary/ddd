@@ -245,3 +245,60 @@ export default function GraphFlow() {
     </div>
   );
 }
+
+
+
+..................
+
+
+
+const rows = YOUR_EXCEL_JSON; // convert excel → JSON first
+
+const nodesMap = new Map();
+const edgesSet = new Set();
+
+const toId = (str: string) =>
+  (str || "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+const addNode = (label: string, level: number) => {
+  const id = toId(label);
+  if (!nodesMap.has(id)) {
+    nodesMap.set(id, { id, label: label || "Unknown", level });
+  }
+  return id;
+};
+
+const addEdge = (source: string, target: string) => {
+  const key = `${source}->${target}`;
+  if (!edgesSet.has(key)) {
+    edgesSet.add(key);
+  }
+};
+
+// 🔥 Core logic (covers ALL rows)
+rows.forEach((row) => {
+  const domain = addNode(row.Domain, 0);
+  const geo = addNode(row.Geography, 1);
+  const platform = addNode(row.Data_Platform, 2);
+  const disposition = addNode(row.System_Disposition, 3);
+  const system = addNode(row.System_Name, 4);
+
+  // Build hierarchy edges
+  addEdge(domain, geo);
+  addEdge(geo, platform);
+  addEdge(platform, disposition);
+  addEdge(disposition, system);
+});
+
+// Final arrays
+const ALL_NODES = Array.from(nodesMap.values());
+const ALL_EDGES = Array.from(edgesSet).map((e) => {
+  const [source, target] = e.split("->");
+  return { source, target };
+});
+
+console.log(ALL_NODES);
+console.log(ALL_EDGES);
