@@ -1,7 +1,3 @@
-const [selectedDomain, setSelectedDomain] = useState(null);
-
-
-
 const onNodeClick = useCallback(
   (_: any, node: any) => {
     if (isLeafNode(node.id)) return;
@@ -10,32 +6,26 @@ const onNodeClick = useCallback(
 
     let currentDomain = selectedDomain;
 
-    // ✅ If clicked Domain → set it
+    // ✅ If user clicks Domain → set it
     if (nodeData.level === 0) {
-      currentDomain = nodeData.id;
-      setSelectedDomain(currentDomain);
+      currentDomain = node.id;
+      setSelectedDomain(node.id);
     }
 
     const ancestors = getAllAncestors(node.id);
 
-    let children: any[] = [];
+    let children = childrenMap[node.id] || [];
 
-    // 🔥 KEY FIX: filter children ONLY for Geography level
+    // 🔥 IMPORTANT FIX (only for Geography level)
     if (nodeData.level === 1 && currentDomain) {
-      children = (childrenMap[node.id] || []).filter((childId) =>
-        childId.startsWith(`${node.id}|`) &&
-        edgesData.some(
-          (e: any) =>
-            e.source === currentDomain && e.target === node.id
-        )
+      children = children.filter((childId: any) =>
+        childId.startsWith(`${node.id}|`)
       );
-    } else {
-      children = childrenMap[node.id] || [];
     }
 
     const newVisible: any = new Set();
 
-    // ✅ always keep Domains
+    // ✅ Always keep Domain visible
     nodesData.forEach((n: any) => {
       if (n.level === 0) newVisible.add(n.id);
     });
@@ -47,38 +37,5 @@ const onNodeClick = useCallback(
     setVisibleNodeIds(newVisible);
     setActiveNode(node.id);
   },
-  [childrenMap, nodeMap, nodesData, selectedDomain, edgesData]
+  [childrenMap, nodeMap, nodesData, selectedDomain]
 );
-
-
-
-
-
-
-......
-
-
-
-
-
-let children = childrenMap[node.id] || [];
-
-const nodeData = nodeMap.get(node.id);
-
-// 🔥 If Geography → filter using domain
-if (nodeData.level === 1 && selectedDomain) {
-  children = children.filter((childId) =>
-    childId.startsWith(`${node.id}|`)
-  );
-
-  // further restrict using domain relationship
-  const validChildren = new Set();
-
-  edgesData.forEach((e: any) => {
-    if (e.source === selectedDomain && e.target === node.id) {
-      children.forEach((c) => validChildren.add(c));
-    }
-  });
-
-  children = Array.from(validChildren);
-}
