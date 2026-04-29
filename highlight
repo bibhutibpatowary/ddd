@@ -1,0 +1,91 @@
+const [activePathEdges, setActivePathEdges] = useState(new Set());
+
+
+
+
+const onNodeClick = useCallback(
+  (_, node) => {
+    if (isLeafNode(node.id)) return;
+
+    const children = childrenMap[node.id] || [];
+    const ancestors = getAllAncestors(node.id);
+
+    const newVisible = new Set();
+
+    // keep Domain always visible
+    nodesData.forEach((n) => {
+      if (n.level === 0) newVisible.add(n.id);
+    });
+
+    ancestors.forEach((a) => newVisible.add(a));
+    newVisible.add(node.id);
+    children.forEach((c) => newVisible.add(c));
+
+    setVisibleNodeIds(newVisible);
+    setActiveNode(node.id);
+
+    // 🔥 BUILD ACTIVE PATH EDGES
+    const pathEdges = new Set();
+
+    let current = node.id;
+
+    while (parentMap[current] && parentMap[current].length > 0) {
+      const parent = parentMap[current][0]; 
+      // ⚠️ pick FIRST parent (selected path)
+
+      pathEdges.add(`${parent}-${current}`);
+      current = parent;
+    }
+
+    setActivePathEdges(pathEdges);
+  },
+  [childrenMap, parentMap, nodesData]
+);
+
+
+
+
+
+
+
+
+
+
+
+const edges = useMemo(() => {
+  return edgesData
+    .filter(
+      (e) =>
+        visibleNodeIds.has(e.source) &&
+        visibleNodeIds.has(e.target)
+    )
+    .map((e) => {
+      const isActivePath = activePathEdges.has(
+        `${e.source}-${e.target}`
+      );
+
+      return {
+        ...e,
+        type: "smoothstep",
+        animated: isActivePath,
+        style: {
+          stroke: isActivePath ? "red" : "#bbb",
+          strokeWidth: isActivePath ? 2.5 : 1,
+          strokeDasharray: isActivePath ? "0" : "5,5" // dotted for others
+        }
+      };
+    });
+}, [edgesData, visibleNodeIds, activePathEdges]);
+
+
+
+
+
+
+
+
+
+
+border: activePathNodes.has(id)
+  ? "2px solid red"
+  : "1px solid #999"
