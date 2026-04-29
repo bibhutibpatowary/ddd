@@ -1,0 +1,258 @@
+import React, { useState, useMemo, useCallback } from "react";
+import ReactFlow, { Background, Controls, Position } from "reactflow";
+import dagre from "dagre";
+import * as XLSX from "xlsx";
+import "reactflow/dist/style.css";
+
+/* =========================
+   🔹 HELPERS
+========================= */
+
+const toId = (str) =>
+  (str || "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+// 🔥 normalize headers (fix System_Name issue)
+const normalizeRow = (row) => {
+  const newRow = {};
+  Object.keys(row).forEach((key) => {
+    const cleanKey = key.trim().replace(/\s+/g, "_");
+    newRow[cleanKey] = row[key];
+  });
+  return newRow;
+};
+
+/* =========================
+   🔹 DAGRE LAYOUT
+========================= */
+
+const getLayoutedElements = (nodes, edges) => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  dagreGraph.setGraph({
+    rankdir: "LR",
+    nodesep: 80,
+    ranksep: 150
+  });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: 150, height: 50 });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  return {
+    nodes: nodes.map((node) => {
+      const pos = dagreGraph.node(node.id);
+      return {
+        ...node,
+        position: { x: pos.x, y: pos.y }
+      };
+    }),
+    edges
+  };
+};
+
+/* =========================
+   🔹 COMPONENT
+========================= */
+
+export default function GraphFlow() {
+  const [nodesData, setNodesData] = useState([]);
+  const [edgesData, setEdgesData] = useState([]);
+
+  const [visibleNodeIds, setVisibleNodeIds] = useState(new Set());
+  const [activeNode, setActiveNode] = useState(null);
+
+  /* =========================
+     🔹 FILE UPLOAD
+  ========================= */
+  const handleUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const workbook = XLSX.read(event.target.result, {
+        type: "binary"
+      });
+
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      // 🔥 normalize headers
+      const cleanData = rawData.map((row) => normalizeRow(row));
+
+      // 🔥 generate graph
+      const nodesMap = new Map();
+      const edgesSet = new Set();
+
+      const addNode = (label, level) => {
+        const id = toId(label);
+        if (!nodesMap.has(id)) {
+          nodesMap.set(id, { id, label: label || "Unknown", level });
+        }
+        return id;
+      };
+
+      const addEdge = (s, t) => {
+        edgesSet.add(`${s}->${t}`);
+      };
+
+      cleanData.forEach((row) => {
+        const domain = addNode(row.Domain, 0);
+        const geo = addNode(row.Geography, 1);
+        const platform = addNode(row.Data_Platform, 2);
+        const disposition = addNode(row.System_Disposition, 3);
+        const system = addNode(row.System_Name, 4);
+
+        addEdge(domain, geo);
+        addEdge(geo, platform);
+        addEdge(platform, disposition);
+        addEdge(disposition, system);
+      });
+
+      const nodesArr = Array.from(nodesMap.values());
+      const edgesArr = Array.from(edgesSet).map((e, i) => {
+        const [source, target] = e.split("->");
+        return {
+          id: `e-${i}`,
+          source,
+          target
+        };
+      });
+
+      setNodesData(nodesArr);
+      setEdgesData(edgesArr);
+
+      // set root nodes (level 0)
+      const roots = nodesArr.filter((n) => n.level === 0).map((n) => n.id);
+      setVisibleNodeIds(new Set(roots));
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  /* =========================
+     🔹 MAPS
+  ========================= */
+  const nodeMap = useMemo(() => {
+    return new Map(nodesData.map((n) => [n.id, n]));
+  }, [nodesData]);
+
+  const { childrenMap, parentMap } = useMemo(() => {
+    const children = {};
+    const parents = {};
+
+    edgesData.forEach(({ source, target }) => {
+      if (!children[source]) children[source] = [];
+      if (!parents[target]) parents[target] = [];
+
+      children[source].push(target);
+      parents[target].push(source);
+    });
+
+    return { childrenMap: children, parentMap: parents };
+  }, [edgesData]);
+
+  /* =========================
+     🔹 ANCESTORS
+  ========================= */
+  const getAllAncestors = (nodeId, visited = new Set()) => {
+    if (visited.has(nodeId)) return visited;
+    visited.add(nodeId);
+
+    (parentMap[nodeId] || []).forEach((p) =>
+      getAllAncestors(p, visited)
+    );
+
+    return visited;
+  };
+
+  /* =========================
+     🔹 BASE NODES
+  ========================= */
+  const baseNodes = useMemo(() => {
+    return Array.from(visibleNodeIds).map((id) => ({
+      id,
+      data: { label: nodeMap.get(id)?.label },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      style: {
+        padding: 10,
+        borderRadius: 8,
+        border:
+          id === activeNode ? "2px solid red" : "1px solid #999",
+        background: id === activeNode ? "#ffeaea" : "#fff"
+      }
+    }));
+  }, [visibleNodeIds, activeNode, nodeMap]);
+
+  /* =========================
+     🔹 EDGES
+  ========================= */
+  const edges = useMemo(() => {
+    return edgesData
+      .filter(
+        (e) =>
+          visibleNodeIds.has(e.source) &&
+          visibleNodeIds.has(e.target)
+      )
+      .map((e) => ({
+        ...e,
+        type: "smoothstep",
+        animated:
+          activeNode &&
+          (e.source === activeNode || e.target === activeNode)
+      }));
+  }, [edgesData, visibleNodeIds, activeNode]);
+
+  /* =========================
+     🔹 LAYOUT
+  ========================= */
+  const { nodes } = useMemo(() => {
+    return getLayoutedElements(baseNodes, edges);
+  }, [baseNodes, edges]);
+
+  /* =========================
+     🔹 CLICK
+  ========================= */
+  const onNodeClick = useCallback(
+    (_, node) => {
+      const children = childrenMap[node.id] || [];
+      const ancestors = getAllAncestors(node.id);
+
+      const newVisible = new Set();
+
+      ancestors.forEach((a) => newVisible.add(a));
+      newVisible.add(node.id);
+      children.forEach((c) => newVisible.add(c));
+
+      setVisibleNodeIds(newVisible);
+      setActiveNode(node.id);
+    },
+    [childrenMap]
+  );
+
+  /* =========================
+     🔹 RENDER
+  ========================= */
+  return (
+    <div style={{ width: "100%", height: "600px" }}>
+      <input type="file" onChange={handleUpload} />
+
+      <ReactFlow nodes={nodes} edges={edges} onNodeClick={onNodeClick} fitView>
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
