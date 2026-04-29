@@ -1,33 +1,324 @@
-const [rows, setRows] = useState([]);
+import React, { useState, useMemo, useCallback } from "react";
+import ReactFlow, { Background, Controls, Position } from "reactflow";
+import dagre from "dagre";
+import * as XLSX from "xlsx";
+import "reactflow/dist/style.css";
+import { Row } from "antd";
 
-const handleFileUpload = (e) => {
-  const file = e.target.files[0];
+/* =========================
+   🔹 HELPERS
+========================= */
 
-  const reader = new FileReader();
+const toId = (str: any) =>
+  (str || "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
 
-  reader.onload = (evt) => {
-    const data = new Uint8Array(evt.target.result);
-    const workbook = XLSX.read(data, { type: "array" });
-
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    const jsonData = XLSX.utils.sheet_to_json(sheet);
-
-    // 🔥 THIS is your rows
-    setRows(jsonData);
-
-    // (optional) also build nodes/edges here if needed
-  };
-
-  reader.readAsArrayBuffer(file);
+// 🔥 normalize headers (fix System_Name issue)
+const normalizeRow = (row: any) => {
+  const newRow: any = {};
+  Object.keys(row).forEach((key) => {
+    const cleanKey = key.trim().replace(/\s+/g, "_");
+    newRow[cleanKey] = row[key];
+  });
+  return newRow;
 };
 
+/* =========================
+   🔹 DAGRE LAYOUT
+========================= */
 
+const getLayoutedElements = (nodes: any, edges: any) => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
 
+  dagreGraph.setGraph({
+    rankdir: "LR",
+    nodesep: 80,
+    ranksep: 150
+  });
 
+  nodes.forEach((node: any) => {
+    dagreGraph.setNode(node.id, { width: 150, height: 50 });
+  });
 
-const filteredRows = rows.filter((row) => {
-  return Object.entries(newContext).every(
-    ([key, value]) => row[key] === value
+  edges.forEach((edge: any) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  return {
+    nodes: nodes.map((node: any) => {
+      const pos = dagreGraph.node(node.id);
+      return {
+        ...node,
+        position: { x: pos.x, y: pos.y }
+      };
+    }),
+    edges
+  };
+};
+
+/* =========================
+   🔹 COMPONENT
+========================= */
+
+export default function GraphFlow() {
+  const [nodesData, setNodesData] = useState([]);
+  const [edgesData, setEdgesData] = useState([]);
+
+  // const ROOT_NODES = ["commercial", "supply_chain", "rnd"];
+
+  const [visibleNodeIds, setVisibleNodeIds] = useState(new Set());
+  const [activeNode, setActiveNode] = useState(null);
+
+  /* =========================
+     🔹 FILE UPLOAD
+  ========================= */
+  const handleUpload = (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const workbook = XLSX.read(event.target?.result, {
+        type: "binary"
+      });
+
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      // 🔥 normalize headers
+      const cleanData = rawData.map((row) => normalizeRow(row));
+
+      // 🔥 generate graph
+      const nodesMap = new Map();
+      const edgesSet = new Set();
+
+      const addNode = (id: any, level: any, labelOverride?: any) => {
+        // const id = toId(label);
+        if (!nodesMap.has(id)) {
+          nodesMap.set(id, { id, label: labelOverride || id.split("|").pop() || "Unknown", level });
+        }
+        return id;
+      };
+
+      const addEdge = (s: any, t: any) => {
+        edgesSet.add(`${s}->${t}`);
+      };
+
+      cleanData.forEach((raw) => {
+        const row = normalizeRow(raw);
+
+        if (!row.Domain && !row.System_Name) return;
+
+        const domainId = addNode(row.Domain, 0);
+
+        const geoId = addNode(row.Geography, 1);
+
+        const dpDispId = addNode(
+          `${geoId}|${row.DP_Disposition}`,
+          2,
+          row.DP_Disposition
+        );
+
+        const platformId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}`,
+          3,
+          row.Data_Platform
+        );
+
+        const techId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}`,
+          4,
+          row.DP_Technology
+        );
+
+        const sysDispId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}`,
+          5,
+          row.System_Disposition
+        );
+
+        const roleLabel = row.Source ? "Source" : "Consuming";
+
+        const roleId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}`,
+          6,
+          roleLabel
+        );
+
+        const systemId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}|${row.System_Name}`,
+          7,
+          row.System_Name
+        );
+
+        // edges (same chain)
+        addEdge(domainId, geoId);
+        addEdge(geoId, dpDispId);
+        addEdge(dpDispId, platformId);
+        addEdge(platformId, techId);
+        addEdge(techId, sysDispId);
+        addEdge(sysDispId, roleId);
+        addEdge(roleId, systemId);
+      });
+
+      const nodesArr: any = Array.from(nodesMap.values());
+      const edgesArr: any = Array.from(edgesSet).map((e: any, i) => {
+        const [source, target] = e.split("->");
+        return {
+          id: `e-${i}`,
+          source,
+          target
+        };
+      });
+
+      setNodesData(nodesArr);
+      setEdgesData(edgesArr);
+
+      // set root nodes (level 0)
+      const roots = nodesArr.filter((n: any) => n.level === 0).map((n: any) => n.id);
+      setVisibleNodeIds(new Set(roots));
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  /* =========================
+     🔹 MAPS
+  ========================= */
+  const nodeMap = useMemo(() => {
+    return new Map(nodesData.map((n: any) => [n.id, n]));
+  }, [nodesData]);
+
+  const { childrenMap, parentMap } = useMemo(() => {
+    const children: any = {};
+    const parents: any = {};
+
+    edgesData.forEach(({ source, target }) => {
+      if (!children[source]) children[source] = [];
+      if (!parents[target]) parents[target] = [];
+
+      children[source].push(target);
+      parents[target].push(source);
+    });
+
+    return { childrenMap: children, parentMap: parents };
+  }, [edgesData]);
+
+  /* =========================
+     🔹 ANCESTORS
+  ========================= */
+  const getAllAncestors = (nodeId: any, visited = new Set()) => {
+    if (visited.has(nodeId)) return visited;
+    visited.add(nodeId);
+
+    (parentMap[nodeId] || []).forEach((p: any) =>
+      getAllAncestors(p, visited)
+    );
+
+    return visited;
+  };
+
+  /* =========================
+     🔹 BASE NODES
+  ========================= */
+
+  const isLeafNode = (nodeId: any) => {
+    return !childrenMap[nodeId] || childrenMap[nodeId].length === 0;
+  }
+
+  const baseNodes = useMemo(() => {
+    return Array.from(visibleNodeIds).map((id) => {
+      const isLeaf = isLeafNode(id);
+
+      return {
+        id,
+        data: { label: nodeMap.get(id)?.label },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        style: {
+          padding: 10,
+          borderRadius: 8,
+          border:
+            id === activeNode ? "2px solid red" : isLeaf ? "2px solid green" : "1px solid #999",
+          background: id === activeNode ? "#ffeaea" : isLeaf ? "#eaffea" : "#fff"
+        }
+      };
+    });
+  }, [visibleNodeIds, activeNode, nodeMap, childrenMap]);
+
+  /* =========================
+     🔹 EDGES
+  ========================= */
+  const edges = useMemo(() => {
+    return edgesData
+      .filter(
+        (e: any) =>
+          visibleNodeIds.has(e.source) &&
+          visibleNodeIds.has(e.target)
+      )
+      .map((e: any) => ({
+        ...e,
+        type: "smoothstep",
+        animated:
+          activeNode &&
+          (e.source === activeNode || e.target === activeNode)
+      }));
+  }, [edgesData, visibleNodeIds, activeNode]);
+
+  /* =========================
+     🔹 LAYOUT
+  ========================= */
+  const { nodes } = useMemo(() => {
+    return getLayoutedElements(baseNodes, edges);
+  }, [baseNodes, edges]);
+
+  /* =========================
+     🔹 CLICK
+  ========================= */
+  const onNodeClick = useCallback(
+    (_: any, node: any) => {
+
+      if (isLeafNode(node.id)) return;
+
+      const children = childrenMap[node.id] || [];
+      const ancestors = getAllAncestors(node.id);
+
+      const newVisible: any = new Set();
+
+      nodesData.forEach((n: any) => {
+        if (n.level === 0) {
+          newVisible.add(n.id);
+        }
+      })
+
+      ancestors.forEach((a) => newVisible.add(a));
+      newVisible.add(node.id);
+      children.forEach((c: any) => newVisible.add(c));
+
+      setVisibleNodeIds(newVisible);
+      setActiveNode(node.id);
+    },
+    [childrenMap]
   );
-});
+
+  /* =========================
+     🔹 RENDER
+  ========================= */
+  return (
+    <div style={{ width: "100%", height: "600px" }}>
+      <Row style={{ padding: "15px" }}>
+        <input type="file" onChange={handleUpload} />
+      </Row>
+      <ReactFlow nodes={nodes} edges={edges} onNodeClick={onNodeClick} fitView>
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
