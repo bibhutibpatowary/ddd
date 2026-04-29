@@ -1,100 +1,70 @@
-const [selectedPath, setSelectedPath] = useState([]);
+const baseNodes = useMemo(() => {
+  return nodesData.map((n: any) => {
+    const isActive = n.id === activeNode;
 
+    const isInPath = selectedPath.includes(n.id);
 
+    return {
+      id: n.id,
+      data: { label: n.label },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      style: {
+        padding: 10,
+        borderRadius: 8,
 
-const onNodeClick = useCallback(
-  (_: any, node: any) => {
-    if (isLeafNode(node.id)) return;
+        // 🔥 highlight path
+        border: isInPath
+          ? "2px solid red"
+          : isActive
+          ? "2px solid orange"
+          : "1px solid #ccc",
 
-    const nodeData = nodeMap.get(node.id);
+        background: isInPath
+          ? "#ffeaea"
+          : isActive
+          ? "#fff3cd"
+          : "#f9f9f9",
 
-    let currentDomain = selectedDomain;
+        opacity: selectedPath.length === 0
+          ? 1
+          : isInPath
+          ? 1
+          : 0.3   // 👈 dim non-selected nodes
+      }
+    };
+  });
+}, [nodesData, activeNode, selectedPath]);
 
-    // 🔥 if Domain clicked → reset path
-    if (nodeData.level === 0) {
-      currentDomain = nodeData.label;
-      setSelectedDomain(currentDomain);
-      setSelectedPath([node.id]); // start new path
-    }
-
-    // 🔥 extend path
-    else {
-      setSelectedPath((prev: any) => {
-        const index = prev.indexOf(node.id);
-
-        // if node already exists → trim path (go back)
-        if (index !== -1) {
-          return prev.slice(0, index + 1);
-        }
-
-        return [...prev, node.id];
-      });
-    }
-
-    const ancestors = getAllAncestors(node.id);
-
-    let children = childrenMap[node.id] || [];
-
-    // 🔥 FILTER (your previous fix)
-    if (nodeData.level === 1 && currentDomain) {
-      const filteredRows = rows.filter(
-        (r: any) =>
-          r.Domain === currentDomain &&
-          r.Geography === nodeData.label
-      );
-
-      const validDPs = new Set(
-        filteredRows.map((r: any) => r.DP_Disposition)
-      );
-
-      children = children.filter((childId: any) => {
-        const label = nodeMap.get(childId)?.label;
-        return validDPs.has(label);
-      });
-    }
-
-    const newVisible: any = new Set();
-
-    nodesData.forEach((n: any) => {
-      if (n.level === 0) newVisible.add(n.id);
-    });
-
-    ancestors.forEach((a: any) => newVisible.add(a));
-    newVisible.add(node.id);
-    children.forEach((c: any) => newVisible.add(c));
-
-    setVisibleNodeIds(newVisible);
-    setActiveNode(node.id);
-  },
-  [childrenMap, nodeMap, nodesData, selectedDomain, rows]
-);
-
-
-
-
+............
 
 const edges = useMemo(() => {
-  return edgesData
-    .filter(
-      (e: any) =>
-        visibleNodeIds.has(e.source) &&
-        visibleNodeIds.has(e.target)
-    )
-    .map((e: any) => {
-      const isPathEdge = selectedPath.some(
-        (nodeId: any, index: number) =>
-          selectedPath[index + 1] === e.target &&
-          nodeId === e.source
-      );
+  return edgesData.map((e: any) => {
+    const isPathEdge = selectedPath.some(
+      (nodeId: any, index: number) =>
+        selectedPath[index + 1] === e.target &&
+        nodeId === e.source
+    );
 
-      return {
-        ...e,
-        type: "smoothstep",
-        animated: isPathEdge,
-        style: {
-          stroke: isPathEdge ? "red" : "#bbb",
-          strokeWidth: isPathEdge ? 2.5 : 1
-        }
-      };
-    });
-}, [edgesData, visibleNodeIds, selectedPath]);
+    return {
+      ...e,
+      type: "smoothstep",
+      animated: isPathEdge,
+      style: {
+        stroke: isPathEdge ? "red" : "#bbb",
+        strokeWidth: isPathEdge ? 2.5 : 1,
+        opacity: selectedPath.length === 0
+          ? 1
+          : isPathEdge
+          ? 1
+          : 0.3   // 👈 dim non-selected edges
+      }
+    };
+  });
+}, [edgesData, selectedPath]);
+
+...........
+
+
+setVisibleNodeIds(newVisible); remove
+
