@@ -138,3 +138,24 @@ const onNodeClick = useCallback(
   [childrenMap, nodeMap, nodesData, selectedDomain, rows]
 );
 
+
+===========
+
+
+const resetGraph = () => {
+  // reset to only root (Domain) nodes
+  const roots = nodesData
+    .filter((n: any) => n.level === 0)
+    .map((n: any) => n.id);
+
+  setVisibleNodeIds(new Set(roots));
+  setSelectedPath([]);
+  setActiveNode(null);
+  setSelectedDomain(null);
+};
+
+
+<div style={{ padding: "10px" }}>
+  <button onClick={resetGraph}>Reset Selection</button>
+</div>
+
