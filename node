@@ -68,3 +68,73 @@ const edges = useMemo(() => {
 
 setVisibleNodeIds(newVisible); remove
 
+
+=============
+
+
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
+    if (isLeafNode(node.id)) return;
+
+    const nodeData = nodeMap.get(node.id);
+
+    let currentDomain = selectedDomain;
+
+    // ✅ Domain click → reset path ONLY (not nodes)
+    if (nodeData.level === 0) {
+      currentDomain = nodeData.label;
+      setSelectedDomain(currentDomain);
+      setSelectedPath([node.id]);
+    } else {
+      // ✅ extend path
+      setSelectedPath((prev: any) => {
+        const index = prev.indexOf(node.id);
+        if (index !== -1) return prev.slice(0, index + 1);
+        return [...prev, node.id];
+      });
+    }
+
+    // 🔥 get children
+    let children = childrenMap[node.id] || [];
+
+    // 🔥 IMPORTANT: filter for Geography
+    if (nodeData.level === 1 && currentDomain) {
+      const filteredRows = rows.filter(
+        (r: any) =>
+          r.Domain === currentDomain &&
+          r.Geography === nodeData.label
+      );
+
+      const validDPs = new Set(
+        filteredRows.map((r: any) => r.DP_Disposition)
+      );
+
+      children = children.filter((childId: any) => {
+        const label = nodeMap.get(childId)?.label;
+        return validDPs.has(label);
+      });
+    }
+
+    // 🔥 KEY CHANGE → accumulate instead of reset
+    setVisibleNodeIds((prev: any) => {
+      const updated = new Set(prev);
+
+      // always keep all domains
+      nodesData.forEach((n: any) => {
+        if (n.level === 0) updated.add(n.id);
+      });
+
+      // add clicked node
+      updated.add(node.id);
+
+      // add children
+      children.forEach((c: any) => updated.add(c));
+
+      return updated;
+    });
+
+    setActiveNode(node.id);
+  },
+  [childrenMap, nodeMap, nodesData, selectedDomain, rows]
+);
+
