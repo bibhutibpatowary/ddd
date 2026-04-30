@@ -1,0 +1,87 @@
+if (isLeafNode(node.id)) return;
+
+
+========
+
+
+const getFullImpactGraph = (nodeId, parentMap, childrenMap) => {
+  const visited = new Set();
+  const queue = [nodeId];
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (visited.has(current)) continue;
+
+    visited.add(current);
+
+    // go UP (parents)
+    (parentMap[current] || []).forEach(p => queue.push(p));
+
+    // go DOWN (children)
+    (childrenMap[current] || []).forEach(c => queue.push(c));
+  }
+
+  return visited;
+};
+
+=========
+
+
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
+
+    // 🔥 CASE 1: LEAF NODE (System_Name)
+    if (isLeafNode(node.id)) {
+
+      const fullGraph = getFullImpactGraph(
+        node.id,
+        parentMap,
+        childrenMap
+      );
+
+      setVisibleNodeIds(fullGraph);
+      setActiveNode(node.id);
+      setSelectedPath([node.id]);
+
+      return;
+    }
+
+    // 🔥 CASE 2: NORMAL NODE (existing logic)
+
+    const children = childrenMap[node.id] || [];
+    const ancestors = getAllAncestors(node.id);
+
+    setVisibleNodeIds((prev: any) => {
+      const updated = new Set(prev);
+
+      const areChildrenVisible = children.every((c: any) =>
+        updated.has(c)
+      );
+
+      if (areChildrenVisible) {
+        const descendants = getAllDescendants(node.id, childrenMap);
+        descendants.forEach((d: any) => updated.delete(d));
+
+        return updated;
+      } else {
+        children.forEach((c: any) => updated.add(c));
+
+        nodesData.forEach((n: any) => {
+          if (n.level === 0) updated.add(n.id);
+        });
+
+        return updated;
+      }
+    });
+
+    setActiveNode(node.id);
+
+    setSelectedPath((prev: any) => {
+      const index = prev.indexOf(node.id);
+      if (index !== -1) return prev.slice(0, index + 1);
+      return [...prev, node.id];
+    });
+
+  },
+  [childrenMap, parentMap, nodesData]
+);
