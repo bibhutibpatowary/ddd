@@ -1,87 +1,66 @@
-if (isLeafNode(node.id)) return;
+const [viewMode, setViewMode] = useState("forward"); 
+// "forward" | "reverse"
 
+==================
 
-========
+const buildReverseGraph = (startId) => {
+  const nodesSet = new Set();
+  const edgesArr = [];
 
-
-const getFullImpactGraph = (nodeId, parentMap, childrenMap) => {
+  const queue = [{ id: startId, level: 0 }];
   const visited = new Set();
-  const queue = [nodeId];
 
   while (queue.length) {
-    const current = queue.shift();
-    if (visited.has(current)) continue;
+    const { id, level } = queue.shift();
 
-    visited.add(current);
+    if (visited.has(id)) continue;
+    visited.add(id);
 
-    // go UP (parents)
-    (parentMap[current] || []).forEach(p => queue.push(p));
+    nodesSet.add({
+      id,
+      label: nodeMap.get(id)?.label,
+      level
+    });
 
-    // go DOWN (children)
-    (childrenMap[current] || []).forEach(c => queue.push(c));
+    const parents = parentMap[id] || [];
+
+    parents.forEach((p) => {
+      edgesArr.push({
+        source: id,   // 🔥 reverse direction
+        target: p
+      });
+
+      queue.push({ id: p, level: level + 1 });
+    });
   }
 
-  return visited;
+  return {
+    nodes: Array.from(nodesSet),
+    edges: edgesArr
+  };
 };
 
-=========
 
+===============
 
-const onNodeClick = useCallback(
-  (_: any, node: any) => {
+if (isLeafNode(node.id)) {
+  const reverseGraph = buildReverseGraph(node.id);
 
-    // 🔥 CASE 1: LEAF NODE (System_Name)
-    if (isLeafNode(node.id)) {
+  setNodesData(reverseGraph.nodes);
+  setEdgesData(
+    reverseGraph.edges.map((e, i) => ({
+      id: `rev-${i}`,
+      ...e
+    }))
+  );
 
-      const fullGraph = getFullImpactGraph(
-        node.id,
-        parentMap,
-        childrenMap
-      );
+  setVisibleNodeIds(
+    new Set(reverseGraph.nodes.map((n) => n.id))
+  );
 
-      setVisibleNodeIds(fullGraph);
-      setActiveNode(node.id);
-      setSelectedPath([node.id]);
+  setViewMode("reverse");
+  setActiveNode(node.id);
+  setSelectedPath([node.id]);
 
-      return;
-    }
-
-    // 🔥 CASE 2: NORMAL NODE (existing logic)
-
-    const children = childrenMap[node.id] || [];
-    const ancestors = getAllAncestors(node.id);
-
-    setVisibleNodeIds((prev: any) => {
-      const updated = new Set(prev);
-
-      const areChildrenVisible = children.every((c: any) =>
-        updated.has(c)
-      );
-
-      if (areChildrenVisible) {
-        const descendants = getAllDescendants(node.id, childrenMap);
-        descendants.forEach((d: any) => updated.delete(d));
-
-        return updated;
-      } else {
-        children.forEach((c: any) => updated.add(c));
-
-        nodesData.forEach((n: any) => {
-          if (n.level === 0) updated.add(n.id);
-        });
-
-        return updated;
-      }
-    });
-
-    setActiveNode(node.id);
-
-    setSelectedPath((prev: any) => {
-      const index = prev.indexOf(node.id);
-      if (index !== -1) return prev.slice(0, index + 1);
-      return [...prev, node.id];
-    });
-
-  },
-  [childrenMap, parentMap, nodesData]
-);
+  return;
+}
