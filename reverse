@@ -1,14 +1,9 @@
-const [viewMode, setViewMode] = useState("forward"); 
-// "forward" | "reverse"
+const buildReverseAppend = (startId, startLevel) => {
+  const newNodes = [];
+  const newEdges = [];
 
-==================
-
-const buildReverseGraph = (startId) => {
-  const nodesSet = new Set();
-  const edgesArr = [];
-
-  const queue = [{ id: startId, level: 0 }];
   const visited = new Set();
+  const queue = [{ id: startId, level: startLevel }];
 
   while (queue.length) {
     const { id, level } = queue.shift();
@@ -16,51 +11,64 @@ const buildReverseGraph = (startId) => {
     if (visited.has(id)) continue;
     visited.add(id);
 
-    nodesSet.add({
-      id,
-      label: nodeMap.get(id)?.label,
-      level
-    });
-
     const parents = parentMap[id] || [];
 
     parents.forEach((p) => {
-      edgesArr.push({
-        source: id,   // 🔥 reverse direction
-        target: p
+      // 🔥 create unique id (to avoid clash)
+      const newId = `${id}__parent__${p}`;
+
+      newNodes.push({
+        id: newId,
+        label: nodeMap.get(p)?.label,
+        level: level + 1
+      });
+
+      newEdges.push({
+        source: id,
+        target: newId
       });
 
       queue.push({ id: p, level: level + 1 });
     });
   }
 
-  return {
-    nodes: Array.from(nodesSet),
-    edges: edgesArr
-  };
+  return { newNodes, newEdges };
 };
 
 
-===============
+=========================
+
 
 if (isLeafNode(node.id)) {
-  const reverseGraph = buildReverseGraph(node.id);
 
-  setNodesData(reverseGraph.nodes);
-  setEdgesData(
-    reverseGraph.edges.map((e, i) => ({
-      id: `rev-${i}`,
+  const currentNode = nodeMap.get(node.id);
+  const startLevel = currentNode?.level || 0;
+
+  const { newNodes, newEdges } = buildReverseAppend(
+    node.id,
+    startLevel
+  );
+
+  // ✅ Append (not replace)
+  setNodesData((prev) => [...prev, ...newNodes]);
+
+  setEdgesData((prev) => [
+    ...prev,
+    ...newEdges.map((e, i) => ({
+      id: `rev-${Date.now()}-${i}`,
       ...e
     }))
-  );
+  ]);
 
-  setVisibleNodeIds(
-    new Set(reverseGraph.nodes.map((n) => n.id))
-  );
+  setVisibleNodeIds((prev) => {
+    const updated = new Set(prev);
 
-  setViewMode("reverse");
+    newNodes.forEach((n) => updated.add(n.id));
+
+    return updated;
+  });
+
   setActiveNode(node.id);
-  setSelectedPath([node.id]);
 
   return;
 }
