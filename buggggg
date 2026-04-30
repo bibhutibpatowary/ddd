@@ -38,3 +38,49 @@ if (areChildrenVisible) {
 
   return cleaned;
 }
+
+
+
+
+-=============
+
+
+setVisibleNodeIds((prev: any) => {
+  const updated = new Set(prev);
+
+  const areChildrenVisible = children.every((c: any) =>
+    updated.has(c)
+  );
+
+  if (areChildrenVisible) {
+    // 🔴 COLLAPSE LOGIC (REPLACE THIS PART)
+
+    const descendants = getAllDescendants(node.id, childrenMap);
+
+    // remove all descendants
+    descendants.forEach((d: any) => updated.delete(d));
+
+    // 🔥 FIX: keep only nodes still reachable from roots
+    const roots = Array.from(updated).filter(
+      (id: any) => nodeMap.get(id)?.level === 0
+    );
+
+    const reachable = getReachableNodes(roots, childrenMap);
+
+    return new Set(
+      Array.from(updated).filter((id: any) => reachable.has(id))
+    );
+
+  } else {
+    // 🟢 EXPAND LOGIC (KEEP AS IS)
+
+    children.forEach((c: any) => updated.add(c));
+
+    // always keep domain nodes
+    nodesData.forEach((n: any) => {
+      if (n.level === 0) updated.add(n.id);
+    });
+
+    return updated;
+  }
+});
