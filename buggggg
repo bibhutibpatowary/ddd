@@ -1,41 +1,58 @@
-if (areChildrenVisible) {
-  const descendants = getAllDescendants(node.id, childrenMap);
-
-  // remove all descendants recursively
-  descendants.forEach((d: any) => updated.delete(d));
-
-  // trim selected path till clicked node
-  setSelectedPath((prev: any) => {
-    const index = prev.indexOf(node.id);
-    if (index === -1) return prev;
-    return prev.slice(0, index + 1);
-  });
-
-  // remove active descendants too
-  descendants.forEach((d: any) => {
-    if (updated.has(d)) {
-      updated.delete(d);
-    }
-  });
-
-  return updated;
-}
-
-===============
-
-const getAllDescendants = (
-  nodeId: any,
-  childrenMap: any,
-  visited = new Set()
-) => {
-  const children = childrenMap[nodeId] || [];
-
-  children.forEach((child: any) => {
-    if (!visited.has(child)) {
-      visited.add(child);
-      getAllDescendants(child, childrenMap, visited);
-    }
-  });
-
-  return visited;
+const LEVEL_COLORS: any = {
+  0: "#4A90E2", // Domain
+  1: "#9B59B6", // Geography
+  2: "#F39C12", // DP_Disposition
+  3: "#1ABC9C", // Data_Platform
+  4: "#2ECC71", // DP_Technology
+  5: "#E67E22", // System_Disposition
+  6: "#F1C40F", // Source/Consuming
+  7: "#95A5A6"  // System_Name
 };
+
+
+
+
+const baseNodes = useMemo(() => {
+  return Array.from(visibleNodeIds).map((id) => {
+    const node = nodeMap.get(id);
+    const level = node?.level;
+
+    const isActive = id === activeNode;
+    const isInPath = selectedPath.includes(id);
+    const isLeaf = isLeafNode(id);
+
+    const baseColor = LEVEL_COLORS[level] || "#ccc";
+
+    return {
+      id,
+      data: { label: node?.label },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      style: {
+        padding: 10,
+        borderRadius: 8,
+
+        // 🔥 border priority
+        border: isInPath
+          ? "3px solid red"
+          : isActive
+          ? "2px solid #000"
+          : `1px solid ${baseColor}`,
+
+        // 🔥 background based on level
+        background: isInPath
+          ? "#ffeaea"
+          : baseColor,
+
+        color: "#fff",
+
+        opacity:
+          selectedPath.length === 0
+            ? 1
+            : isInPath
+            ? 1
+            : 0.35
+      }
+    };
+  });
+}, [visibleNodeIds, activeNode, selectedPath, nodeMap, childrenMap]);
