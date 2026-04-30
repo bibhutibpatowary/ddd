@@ -1,5 +1,5 @@
-const buildReverseAppend = (startId, startLevel) => {
-  const newNodes = [];
+const buildFullReverseAppend = (startId, startLevel) => {
+  const newNodesMap = new Map();
   const newEdges = [];
 
   const visited = new Set();
@@ -13,45 +13,60 @@ const buildReverseAppend = (startId, startLevel) => {
 
     const parents = parentMap[id] || [];
 
-    parents.forEach((p) => {
-      // 🔥 create unique id (to avoid clash)
-      const newId = `${id}__parent__${p}`;
+    parents.forEach((parentId) => {
+      const originalParent = nodeMap.get(parentId);
 
-      newNodes.push({
-        id: newId,
-        label: nodeMap.get(p)?.label,
-        level: level + 1
-      });
+      // 🔥 unique id to avoid collision
+      const newId = `${startId}__rev__${parentId}`;
 
+      if (!newNodesMap.has(newId)) {
+        newNodesMap.set(newId, {
+          id: newId,
+          label: originalParent?.label,
+          level: level + 1
+        });
+      }
+
+      // edge from child → parent (reverse direction)
       newEdges.push({
         source: id,
         target: newId
       });
 
-      queue.push({ id: p, level: level + 1 });
+      queue.push({
+        id: parentId,
+        level: level + 1
+      });
     });
   }
 
-  return { newNodes, newEdges };
+  return {
+    newNodes: Array.from(newNodesMap.values()),
+    newEdges
+  };
 };
 
 
-=========================
+=========
 
 
 if (isLeafNode(node.id)) {
 
-  const currentNode = nodeMap.get(node.id);
-  const startLevel = currentNode?.level || 0;
+  const startLevel = nodeMap.get(node.id)?.level || 0;
 
-  const { newNodes, newEdges } = buildReverseAppend(
+  const { newNodes, newEdges } = buildFullReverseAppend(
     node.id,
     startLevel
   );
 
-  // ✅ Append (not replace)
-  setNodesData((prev) => [...prev, ...newNodes]);
+  // ✅ append nodes
+  setNodesData((prev) => {
+    const existingIds = new Set(prev.map((n) => n.id));
+    const filtered = newNodes.filter((n) => !existingIds.has(n.id));
+    return [...prev, ...filtered];
+  });
 
+  // ✅ append edges
   setEdgesData((prev) => [
     ...prev,
     ...newEdges.map((e, i) => ({
@@ -60,11 +75,10 @@ if (isLeafNode(node.id)) {
     }))
   ]);
 
+  // ✅ show them
   setVisibleNodeIds((prev) => {
     const updated = new Set(prev);
-
     newNodes.forEach((n) => updated.add(n.id));
-
     return updated;
   });
 
