@@ -1,0 +1,40 @@
+const getReachableNodes = (visibleRoots: any, childrenMap: any) => {
+  const visited = new Set();
+
+  const dfs = (nodeId: any) => {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
+
+    (childrenMap[nodeId] || []).forEach(dfs);
+  };
+
+  visibleRoots.forEach((root: any) => dfs(root));
+
+  return visited;
+};
+
+
+
+========
+
+
+if (areChildrenVisible) {
+  // ❌ remove all descendants first
+  const descendants = getAllDescendants(node.id, childrenMap);
+
+  descendants.forEach((d: any) => updated.delete(d));
+
+  // 🔥 FIX: re-add nodes that are still reachable from other parents
+  const roots = Array.from(updated).filter(
+    (id: any) => nodeMap.get(id)?.level === 0
+  );
+
+  const reachable = getReachableNodes(roots, childrenMap);
+
+  // keep only reachable nodes
+  const cleaned = new Set(
+    Array.from(updated).filter((id: any) => reachable.has(id))
+  );
+
+  return cleaned;
+}
