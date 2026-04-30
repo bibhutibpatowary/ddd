@@ -1,35 +1,41 @@
-setVisibleNodeIds((prev: any) => {
-  const updated = new Set(prev);
+if (areChildrenVisible) {
+  const descendants = getAllDescendants(node.id, childrenMap);
 
-  const areChildrenVisible = children.some((c: any) =>
-    updated.has(c)
-  );
+  // remove all descendants recursively
+  descendants.forEach((d: any) => updated.delete(d));
 
-  if (areChildrenVisible) {
-    // 🔥 collapse entire branch from clicked node
-    const descendants = getAllDescendants(node.id, childrenMap);
+  // trim selected path till clicked node
+  setSelectedPath((prev: any) => {
+    const index = prev.indexOf(node.id);
+    if (index === -1) return prev;
+    return prev.slice(0, index + 1);
+  });
 
-    descendants.forEach((d: any) => {
+  // remove active descendants too
+  descendants.forEach((d: any) => {
+    if (updated.has(d)) {
       updated.delete(d);
-    });
-
-    // remove path beyond clicked node
-    setSelectedPath((prevPath: any) => {
-      const index = prevPath.indexOf(node.id);
-      return index !== -1
-        ? prevPath.slice(0, index + 1)
-        : prevPath;
-    });
-
-  } else {
-    // expand
-    children.forEach((c: any) => updated.add(c));
-  }
-
-  // always keep level 0 visible
-  nodesData.forEach((n: any) => {
-    if (n.level === 0) updated.add(n.id);
+    }
   });
 
   return updated;
-});
+}
+
+===============
+
+const getAllDescendants = (
+  nodeId: any,
+  childrenMap: any,
+  visited = new Set()
+) => {
+  const children = childrenMap[nodeId] || [];
+
+  children.forEach((child: any) => {
+    if (!visited.has(child)) {
+      visited.add(child);
+      getAllDescendants(child, childrenMap, visited);
+    }
+  });
+
+  return visited;
+};
