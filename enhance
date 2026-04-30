@@ -1,0 +1,88 @@
+const getAllDescendants = (nodeId: any, childrenMap: any, visited = new Set()) => {
+  if (visited.has(nodeId)) return visited;
+
+  const children = childrenMap[nodeId] || [];
+
+  children.forEach((child: any) => {
+    visited.add(child);
+    getAllDescendants(child, childrenMap, visited);
+  });
+
+  return visited;
+};
+
+
+===========
+
+
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
+    if (isLeafNode(node.id)) return;
+
+    const nodeData = nodeMap.get(node.id);
+
+    let currentDomain = selectedDomain;
+
+    // ✅ handle domain selection
+    if (nodeData.level === 0) {
+      currentDomain = nodeData.label;
+      setSelectedDomain(currentDomain);
+      setSelectedPath([node.id]);
+    } else {
+      setSelectedPath((prev: any) => {
+        const index = prev.indexOf(node.id);
+        if (index !== -1) return prev.slice(0, index + 1);
+        return [...prev, node.id];
+      });
+    }
+
+    let children = childrenMap[node.id] || [];
+
+    // 🔥 filter for Geography (your previous fix)
+    if (nodeData.level === 1 && currentDomain) {
+      const filteredRows = rows.filter(
+        (r: any) =>
+          r.Domain === currentDomain &&
+          r.Geography === nodeData.label
+      );
+
+      const validDPs = new Set(
+        filteredRows.map((r: any) => r.DP_Disposition)
+      );
+
+      children = children.filter((childId: any) => {
+        const label = nodeMap.get(childId)?.label;
+        return validDPs.has(label);
+      });
+    }
+
+    setVisibleNodeIds((prev: any) => {
+      const updated = new Set(prev);
+
+      // 🔥 CHECK: if children already visible → collapse
+      const areChildrenVisible = children.every((c: any) =>
+        updated.has(c)
+      );
+
+      if (areChildrenVisible) {
+        // ❌ REMOVE all descendants
+        const descendants = getAllDescendants(node.id, childrenMap);
+
+        descendants.forEach((d: any) => updated.delete(d));
+      } else {
+        // ✅ ADD children
+        children.forEach((c: any) => updated.add(c));
+      }
+
+      // always keep domain nodes
+      nodesData.forEach((n: any) => {
+        if (n.level === 0) updated.add(n.id);
+      });
+
+      return updated;
+    });
+
+    setActiveNode(node.id);
+  },
+  [childrenMap, nodeMap, nodesData, selectedDomain, rows]
+);
