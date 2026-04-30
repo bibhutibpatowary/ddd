@@ -1,84 +1,43 @@
-const buildFullReverseAppend = (startId, startLevel) => {
-  const newNodesMap = new Map();
-  const newEdges = [];
-
-  const visited = new Set();
-  const queue = [{ id: startId, level: startLevel }];
-
-  while (queue.length) {
-    const { id, level } = queue.shift();
-
-    if (visited.has(id)) continue;
-    visited.add(id);
-
-    const parents = parentMap[id] || [];
-
-    parents.forEach((parentId) => {
-      const originalParent = nodeMap.get(parentId);
-
-      // 🔥 unique id to avoid collision
-      const newId = `${startId}__rev__${parentId}`;
-
-      if (!newNodesMap.has(newId)) {
-        newNodesMap.set(newId, {
-          id: newId,
-          label: originalParent?.label,
-          level: level + 1
-        });
-      }
-
-      // edge from child → parent (reverse direction)
-      newEdges.push({
-        source: id,
-        target: newId
-      });
-
-      queue.push({
-        id: parentId,
-        level: level + 1
-      });
-    });
-  }
-
-  return {
-    newNodes: Array.from(newNodesMap.values()),
-    newEdges
-  };
-};
-
-
-=========
-
-
 if (isLeafNode(node.id)) {
 
-  const startLevel = nodeMap.get(node.id)?.level || 0;
+  const reverseGraph = buildReverseGraph(node.id);
 
-  const { newNodes, newEdges } = buildFullReverseAppend(
-    node.id,
-    startLevel
-  );
-
-  // ✅ append nodes
+  // ✅ Append nodes (avoid duplicates)
   setNodesData((prev) => {
     const existingIds = new Set(prev.map((n) => n.id));
-    const filtered = newNodes.filter((n) => !existingIds.has(n.id));
-    return [...prev, ...filtered];
+
+    const newNodes = reverseGraph.nodes.filter(
+      (n) => !existingIds.has(n.id)
+    );
+
+    return [...prev, ...newNodes];
   });
 
-  // ✅ append edges
-  setEdgesData((prev) => [
-    ...prev,
-    ...newEdges.map((e, i) => ({
-      id: `rev-${Date.now()}-${i}`,
-      ...e
-    }))
-  ]);
+  // ✅ Append edges (avoid duplicates)
+  setEdgesData((prev) => {
+    const existingEdges = new Set(
+      prev.map((e) => `${e.source}->${e.target}`)
+    );
 
-  // ✅ show them
+    const newEdges = reverseGraph.edges.filter(
+      (e) => !existingEdges.has(`${e.source}->${e.target}`)
+    );
+
+    return [
+      ...prev,
+      ...newEdges.map((e, i) => ({
+        id: `rev-${Date.now()}-${i}`,
+        ...e
+      }))
+    ];
+  });
+
+  // ✅ Make them visible
   setVisibleNodeIds((prev) => {
     const updated = new Set(prev);
-    newNodes.forEach((n) => updated.add(n.id));
+
+    reverseGraph.nodes.forEach((n) => updated.add(n.id));
+
     return updated;
   });
 
