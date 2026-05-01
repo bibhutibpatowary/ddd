@@ -1,31 +1,18 @@
-// 🔥 get dynamic columns
-const columns = Object.keys(cleanData[0] || {});
-
-// 🔥 merge Source + Consuming into single logical column
-const processedColumns = columns.map((col) =>
-  col === "Source" || col === "Consuming" ? "Role" : col
-);
-
-// remove duplicates (because Source & Consuming both become Role)
-const uniqueColumns = [...new Set(processedColumns)];
+// 🔥 get dynamic columns in order
+const columns: string[] = Object.keys(cleanData[0] || {});
 
 cleanData.forEach((raw: any) => {
   const row = normalizeRow(raw);
 
   let prevNodeId: string | null = null;
 
-  uniqueColumns.forEach((col, level) => {
-    let value = "";
+  columns.forEach((col: string, level: number) => {
+    const value = row[col];
 
-    if (col === "Role") {
-      value = row.Source ? "Source" : row.Consuming ? "Consuming" : "";
-    } else {
-      value = row[col];
-    }
-
+    // skip empty cells
     if (!value) return;
 
-    // 🔥 build unique hierarchical id
+    // 🔥 hierarchical unique id
     const nodeId = prevNodeId
       ? `${prevNodeId}|${value}`
       : value;
