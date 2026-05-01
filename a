@@ -1,319 +1,384 @@
 import React, { useState, useMemo, useCallback } from "react";
-import ReactFlow, {
-  Background,
-  Controls,
-  Position
-} from "reactflow";
+import ReactFlow, { Background, Controls, Position } from "reactflow";
 import dagre from "dagre";
+import * as XLSX from "xlsx";
 import "reactflow/dist/style.css";
+import { Button, Col, Input, Row } from "antd";
 
-/* =========================
-   🔹 DATA
-========================= */
 
-const ALL_NODES = [
-  { id: "product", label: "Product", level: 0 },
-  { id: "patient", label: "Patient", level: 0 },
-  { id: "hcx", label: "HCX", level: 0 },
+const LEVEL_COLORS: any = {
+  0: "#4A90E2", // Domain
+  1: "#9B59B6", // Geography
+  2: "#F39C12", // DP_Disposition
+  3: "#1ABC9C", // Data_Platform
+  4: "#2ECC71", // DP_Technology
+  5: "#E67E22", // System_Disposition
+  6: "#F1C40F", // Source/Consuming
+  7: "#95A5A6"  // System_Name
+};
 
-  { id: "na", label: "NA", level: 1 },
-  { id: "yes", label: "Yes", level: 1 },
-  { id: "no", label: "No", level: 1 },
+const normalizeRow = (row: any) => {
+  const newRow: any = {};
+  Object.keys(row).forEach((key) => {
+    const cleanKey = key.trim().replace(/\s+/g, "_");
+    newRow[cleanKey] = row[key];
+  });
+  return newRow;
+};
 
-  { id: "market_insulin", label: "Market - Insulin", level: 2 },
-  { id: "market_niad", label: "Market - NIAD", level: 2 },
-  { id: "market_hgh", label: "Market - HGH", level: 2 },
-
-  { id: "analytics", label: "Enterprise Analytics", level: 3 },
-  { id: "cmr", label: "CMR", level: 3 },
-  { id: "psp", label: "PSP", level: 3 },
-
-  { id: "diabetes", label: "Diabetes", level: 4 },
-  { id: "rare", label: "Rare Disease", level: 4 }
-];
-
-const ALL_EDGES = [
-  { source: "product", target: "na" },
-  { source: "patient", target: "yes" },
-  { source: "hcx", target: "no" },
-
-  { source: "na", target: "market_insulin" },
-  { source: "yes", target: "market_niad" },
-  { source: "no", target: "market_hgh" },
-
-  { source: "yes", target: "market_insulin" },
-  { source: "na", target: "market_niad" },
-
-  { source: "market_insulin", target: "analytics" },
-  { source: "market_insulin", target: "cmr" },
-  { source: "market_niad", target: "psp" },
-
-  { source: "market_hgh", target: "analytics" },
-
-  { source: "analytics", target: "diabetes" },
-  { source: "cmr", target: "rare" },
-  { source: "psp", target: "diabetes" }
-];
-
-/* =========================
-   🔹 LOOKUPS
-========================= */
-
-const nodeMap = new Map(ALL_NODES.map(n => [n.id, n]));
-
-const childrenMap = {};
-const parentMap = {};
-
-ALL_EDGES.forEach(({ source, target }) => {
-  if (!childrenMap[source]) childrenMap[source] = [];
-  if (!parentMap[target]) parentMap[target] = [];
-
-  childrenMap[source].push(target);
-  parentMap[target].push(source);
-});
-
-/* =========================
-   🔹 DAGRE LAYOUT
-========================= */
-
-const getLayoutedElements = (nodes, edges) => {
+const getLayoutedElements = (nodes: any, edges: any) => {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
   dagreGraph.setGraph({
-    rankdir: "LR", // left → right
+    rankdir: "LR",
     nodesep: 80,
     ranksep: 150
   });
 
-  nodes.forEach(node => {
+  nodes.forEach((node: any) => {
     dagreGraph.setNode(node.id, { width: 150, height: 50 });
   });
 
-  edges.forEach(edge => {
+  edges.forEach((edge: any) => {
     dagreGraph.setEdge(edge.source, edge.target);
   });
 
   dagre.layout(dagreGraph);
 
-  const layoutedNodes = nodes.map(node => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-
-    return {
-      ...node,
-      position: {
-        x: nodeWithPosition.x,
-        y: nodeWithPosition.y
-      }
-    };
-  });
-
-  return { nodes: layoutedNodes, edges };
+  return {
+    nodes: nodes.map((node: any) => {
+      const pos = dagreGraph.node(node.id);
+      return {
+        ...node,
+        position: { x: pos.x, y: pos.y }
+      };
+    }),
+    edges
+  };
 };
-
-/* =========================
-   🔹 GET ALL ANCESTORS
-========================= */
-
-const getAllAncestors = (nodeId, visited = new Set()) => {
-  if (visited.has(nodeId)) return visited;
-  visited.add(nodeId);
-
-  (parentMap[nodeId] || []).forEach(parent => {
-    getAllAncestors(parent, visited);
-  });
-
-  return visited;
-};
-
-/* =========================
-   🔹 COMPONENT
-========================= */
 
 export default function GraphFlow() {
-  const ROOT_NODES = ["product", "patient", "hcx"];
+  const [nodesData, setNodesData] = useState([]);
+  const [edgesData, setEdgesData] = useState([]);
+  const [selectedDomain, setSelectedDomain] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [selectedPath, setSelectedPath] = useState<any>([]);
 
-  const [visibleNodeIds, setVisibleNodeIds] = useState(
-    new Set(ROOT_NODES)
-  );
-
+  const [visibleNodeIds, setVisibleNodeIds] = useState(new Set());
   const [activeNode, setActiveNode] = useState(null);
 
-  /* =========================
-     🔹 BASE NODES
-  ========================= */
+  const handleUpload = (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const workbook = XLSX.read(event.target?.result, {
+        type: "binary"
+      });
+
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      const cleanData: any = rawData.map((row) => normalizeRow(row));
+
+      const nodesMap = new Map();
+      const edgesSet = new Set();
+
+      const addNode = (id: any, level: any, labelOverride?: any) => {
+        if (!nodesMap.has(id)) {
+          nodesMap.set(id, { id, label: labelOverride || id.split("|").pop() || "Unknown", level });
+        }
+        return id;
+      };
+
+      const addEdge = (s: any, t: any) => {
+        edgesSet.add(`${s}->${t}`);
+      };
+
+      cleanData.forEach((raw: any) => {
+        const row = normalizeRow(raw);
+
+        if (!row.Domain && !row.System_Name) return;
+
+        const domainId = addNode(row.Domain, 0);
+
+        const geoId = addNode(row.Geography, 1);
+
+        const dpDispId = addNode(
+          `${geoId}|${row.DP_Disposition}`,
+          2,
+          row.DP_Disposition
+        );
+
+        const platformId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}`,
+          3,
+          row.Data_Platform
+        );
+
+        const techId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}`,
+          4,
+          row.DP_Technology
+        );
+
+        const sysDispId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}`,
+          5,
+          row.System_Disposition
+        );
+
+        const roleLabel = row.Source ? "Source" : "Consuming";
+
+        const roleId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}`,
+          6,
+          roleLabel
+        );
+
+        const systemId = addNode(
+          `${geoId}|${row.DP_Disposition}|${row.Data_Platform}|${row.DP_Technology}|${row.System_Disposition}|${roleLabel}|${row.System_Name}`,
+          7,
+          row.System_Name
+        );
+        addEdge(domainId, geoId);
+        addEdge(geoId, dpDispId);
+        addEdge(dpDispId, platformId);
+        addEdge(platformId, techId);
+        addEdge(techId, sysDispId);
+        addEdge(sysDispId, roleId);
+        addEdge(roleId, systemId);
+      });
+
+      setRows(cleanData);
+
+      const nodesArr: any = Array.from(nodesMap.values());
+      const edgesArr: any = Array.from(edgesSet).map((e: any, i) => {
+        const [source, target] = e.split("->");
+        return {
+          id: `e-${i}`,
+          source,
+          target
+        };
+      });
+
+      setNodesData(nodesArr);
+      setEdgesData(edgesArr);
+      const roots = nodesArr.filter((n: any) => n.level === 0).map((n: any) => n.id);
+      setVisibleNodeIds(new Set(roots));
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  const nodeMap = useMemo(() => {
+    return new Map(nodesData.map((n: any) => [n.id, n]));
+  }, [nodesData]);
+
+  const { childrenMap, parentMap } = useMemo(() => {
+    const children: any = {};
+    const parents: any = {};
+
+    edgesData.forEach(({ source, target }) => {
+      if (!children[source]) children[source] = [];
+      if (!parents[target]) parents[target] = [];
+
+      children[source].push(target);
+      parents[target].push(source);
+    });
+
+    return { childrenMap: children, parentMap: parents };
+  }, [edgesData]);
+
+  const isLeafNode = (nodeId: any) => {
+    return !childrenMap[nodeId] || childrenMap[nodeId].length === 0;
+  }
+
   const baseNodes = useMemo(() => {
-    return Array.from(visibleNodeIds).map(id => ({
-      id,
-      data: { label: nodeMap.get(id).label },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-      style: {
-        padding: 10,
-        borderRadius: 8,
-        border:
-          id === activeNode ? "2px solid red" : "1px solid #999",
-        background: id === activeNode ? "#ffeaea" : "#fff"
-      }
-    }));
-  }, [visibleNodeIds, activeNode]);
+    return Array.from(visibleNodeIds).map((id) => {
+      const node = nodeMap.get(id);
+      const level = node?.level;
 
-  /* =========================
-     🔹 EDGES
-  ========================= */
+      const isActive = id === activeNode;
+      const isInPath = selectedPath.includes(id);
+
+      const baseColor = LEVEL_COLORS[level] || "#ccc";
+
+      return {
+        id,
+        data: { label: node?.label },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        style: {
+          padding: 10,
+          borderRadius: 8,
+
+          border: isInPath
+            ? "3px solid red"
+            : isActive
+              ? "2px solid #000"
+              : `1px solid ${baseColor}`,
+          background: baseColor,
+
+          color: "#fff",
+
+          opacity: 1
+        }
+      };
+    });
+  }, [visibleNodeIds, activeNode, selectedPath, nodeMap, childrenMap]);
+
   const edges = useMemo(() => {
-    return ALL_EDGES.filter(
-      e =>
-        visibleNodeIds.has(e.source) &&
-        visibleNodeIds.has(e.target)
-    ).map(e => ({
-      id: `${e.source}-${e.target}`,
-      source: e.source,
-      target: e.target,
-      type: "smoothstep",
-      animated:
-        activeNode &&
-        (e.source === activeNode || e.target === activeNode),
-      style: {
-        stroke:
-          activeNode &&
-          (e.source === activeNode || e.target === activeNode)
-            ? "red"
-            : "#bbb"
-      }
-    }));
-  }, [visibleNodeIds, activeNode]);
+    return edgesData
+      .filter(
+        (e: any) =>
+          visibleNodeIds.has(e.source) &&
+          visibleNodeIds.has(e.target)
+      )
+      .map((e: any) => {
+        const isPathEdge = selectedPath.some(
+          (nodeId: any, index: number) =>
+            selectedPath[index + 1] === e.target &&
+            nodeId === e.source
+        );
 
-  /* =========================
-     🔹 APPLY DAGRE
-  ========================= */
+        return {
+          ...e,
+          type: "smoothstep",
+          animated: isPathEdge,
+          style: {
+            stroke: isPathEdge ? "red" : "#bbb",
+            strokeWidth: isPathEdge ? 2.5 : 1
+          }
+        };
+      });
+  }, [edgesData, visibleNodeIds, selectedPath]);
+
   const { nodes } = useMemo(() => {
     return getLayoutedElements(baseNodes, edges);
   }, [baseNodes, edges]);
 
-  /* =========================
-     🔹 CLICK HANDLER
-  ========================= */
-  const onNodeClick = useCallback((_, node) => {
-    const children = childrenMap[node.id] || [];
-    const ancestors = getAllAncestors(node.id);
+  const getAllDescendants = (
+    nodeId: any,
+    childrenMap: any,
+    visited = new Set()
+  ) => {
+    const children = childrenMap[nodeId] || [];
 
-    const newVisible = new Set(ROOT_NODES);
+    children.forEach((child: any) => {
+      if (!visited.has(child)) {
+        visited.add(child);
+        getAllDescendants(child, childrenMap, visited);
+      }
+    });
 
-    ancestors.forEach(a => newVisible.add(a));
-    newVisible.add(node.id);
-    children.forEach(c => newVisible.add(c));
+    return visited;
+  };
 
-    setVisibleNodeIds(newVisible);
-    setActiveNode(node.id);
-  }, []);
+  const onNodeClick = useCallback(
+    (_: any, node: any) => {
+      if (isLeafNode(node.id)) return;
 
-  /* =========================
-     🔹 COLUMN HEADERS
-  ========================= */
-  const headers = useMemo(() => {
-    const levels = [...new Set(
-      Array.from(visibleNodeIds).map(id => nodeMap.get(id).level)
-    )];
+      const nodeData = nodeMap.get(node.id);
 
-    return levels.map(level => (
-      <div
-        key={level}
-        style={{
-          position: "absolute",
-          left: level * 200,
-          top: 0,
-          fontWeight: "bold"
-        }}
-      >
-        Level {level}
-      </div>
-    ));
-  }, [visibleNodeIds]);
+      let currentDomain = selectedDomain;
 
-  /* =========================
-     🔹 RENDER
-  ========================= */
+      if (nodeData.level === 0) {
+        currentDomain = nodeData.label;
+        setSelectedDomain(currentDomain);
+        setSelectedPath([node.id]);
+      } else {
+        setSelectedPath((prev: any) => {
+          const index = prev.indexOf(node.id);
+          if (index !== -1) return prev.slice(0, index + 1);
+          return [...prev, node.id];
+        });
+      }
+
+      let children = childrenMap[node.id] || [];
+      if (nodeData.level === 1 && currentDomain) {
+        const filteredRows = rows.filter(
+          (r: any) =>
+            r.Domain === currentDomain &&
+            r.Geography === nodeData.label
+        );
+
+        const validDPs = new Set(
+          filteredRows.map((r: any) => r.DP_Disposition)
+        );
+
+        children = children.filter((childId: any) => {
+          const label = nodeMap.get(childId)?.label;
+          return validDPs.has(label);
+        });
+      }
+      setVisibleNodeIds((prev: any) => {
+        const updated = new Set(prev);
+
+        const areChildrenVisible = children.every((c: any) =>
+          updated.has(c)
+        );
+
+        if (areChildrenVisible) {
+          const descendants = getAllDescendants(node.id, childrenMap);
+
+          descendants.forEach((d: any) => updated.delete(d));
+
+          setSelectedPath((prev: any) => {
+            const index = prev.indexOf(node.id);
+            if (index === -1) return prev;
+            return prev.slice(0, index + 1);
+          });
+
+          descendants.forEach((d: any) => {
+            if (updated.has(d)) {
+              updated.delete(d);
+            }
+          });
+
+          return updated;
+        } else {
+          children.forEach((c: any) => updated.add(c));
+
+          nodesData.forEach((n: any) => {
+            if (n.level === 0) updated.add(n.id);
+          });
+
+          return updated;
+        }
+      });
+
+      setActiveNode(node.id);
+    },
+    [childrenMap, nodeMap, nodesData, selectedDomain, rows]
+  );
+
+  const resetGraph = () => {
+    const roots = nodesData
+      .filter((n: any) => n.level === 0)
+      .map((n: any) => n.id);
+
+    setVisibleNodeIds(new Set(roots));
+    setSelectedPath([]);
+    setActiveNode(null);
+    setSelectedDomain(null);
+  };
+
   return (
-    <div style={{ width: "100%", height: "600px", position: "relative" }}>
-      {headers}
-
-      <ReactFlow nodes={nodes} edges={edges} onNodeClick={onNodeClick} fitView>
+    <div style={{ width: "100%", height: "600px" }}>
+      <Row style={{ padding: "15px" }}>
+        <Col span={4}>
+          <Input type="file" onChange={handleUpload} />
+        </Col>
+        <Button type="primary" style={{ marginLeft: '10px' }} onClick={resetGraph}>Reset Selection</Button>
+      </Row>
+      <ReactFlow nodes={nodes} edges={edges} minZoom={0.1} onNodeClick={onNodeClick} fitView>
         <Background />
         <Controls />
       </ReactFlow>
     </div>
   );
 }
-
-
-
-..................
-
-
-
-const rows = YOUR_EXCEL_JSON; // convert excel → JSON first
-
-const nodesMap = new Map();
-const edgesSet = new Set();
-
-const toId = (str: string) =>
-  (str || "unknown")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_|_$/g, "");
-
-const addNode = (label: string, level: number) => {
-  const id = toId(label);
-  if (!nodesMap.has(id)) {
-    nodesMap.set(id, { id, label: label || "Unknown", level });
-  }
-  return id;
-};
-
-const addEdge = (source: string, target: string) => {
-  const key = `${source}->${target}`;
-  if (!edgesSet.has(key)) {
-    edgesSet.add(key);
-  }
-};
-
-// 🔥 Core logic (covers ALL rows)
-rows.forEach((row) => {
-  const domain = addNode(row.Domain, 0);
-  const geo = addNode(row.Geography, 1);
-  const platform = addNode(row.Data_Platform, 2);
-  const disposition = addNode(row.System_Disposition, 3);
-  const system = addNode(row.System_Name, 4);
-
-  // Build hierarchy edges
-  addEdge(domain, geo);
-  addEdge(geo, platform);
-  addEdge(platform, disposition);
-  addEdge(disposition, system);
-});
-
-// Final arrays
-const ALL_NODES = Array.from(nodesMap.values());
-const ALL_EDGES = Array.from(edgesSet).map((e) => {
-  const [source, target] = e.split("->");
-  return { source, target };
-});
-
-console.log(ALL_NODES);
-console.log(ALL_EDGES);
-
-
-
-............
-
-
-
-import * as XLSX from "xlsx";
-
-const workbook = XLSX.readFile("your-file.xlsx");
-const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-const data = XLSX.utils.sheet_to_json(sheet);
-
-console.log(JSON.stringify(data, null, 2));
