@@ -1,32 +1,135 @@
+const [backtrackEdges, setBacktrackEdges] = useState<any[]>([]);
+
+
+const getBacktrackEdges = (nodeId: any, parentMap: any) => {
+  const edges: any[] = [];
+  const visited = new Set();
+
+  const dfs = (child: any) => {
+    const parents = parentMap[child] || [];
+
+    parents.forEach((parent: any) => {
+      const key = `${child}->${parent}`;
+      if (!visited.has(key)) {
+        visited.add(key);
+
+        edges.push({
+          source: child,
+          target: parent
+        });
+
+        dfs(parent);
+      }
+    });
+  };
+
+  dfs(nodeId);
+  return edges;
+};
+
+
+
+
+=============
+
+
+onNodeClick
+
+if (!isLeafNode(node.id)) {
+  // ❌ If NOT last node → remove backtrack
+  setBacktrackEdges([]);
+}
+
+
+if (isLeafNode(node.id)) {
+  // 🔥 generate full reverse path
+  const edges = getBacktrackEdges(node.id, parentMap);
+
+  setBacktrackEdges(edges);
+  return;
+}
+
+
+
+=======
+
+
+const edges = useMemo(() => {
+  const normalEdges = edgesData
+    .filter(
+      (e: any) =>
+        visibleNodeIds.has(e.source) &&
+        visibleNodeIds.has(e.target)
+    )
+    .map((e: any) => {
+      const isPathEdge = selectedPath.some(
+        (nodeId: any, index: number) =>
+          selectedPath[index + 1] === e.target &&
+          nodeId === e.source
+      );
+
+      return {
+        ...e,
+        type: "smoothstep",
+        animated: isPathEdge,
+        style: {
+          stroke: isPathEdge ? "red" : "#bbb",
+          strokeWidth: isPathEdge ? 2.5 : 1
+        }
+      };
+    });
+
+  // 🔥 BACKTRACK EDGES (reverse direction)
+  const reverseEdges = backtrackEdges.map((e: any, i: number) => ({
+    id: `back-${i}`,
+
+    // 🔥 reverse direction visually
+    source: e.target,
+    target: e.source,
+
+    type: "smoothstep",
+    animated: true,
+    style: {
+      stroke: "#FF5733",
+      strokeWidth: 3,
+      strokeDasharray: "5,5"
+    }
+  }));
+
+  return [...normalEdges, ...reverseEdges];
+}, [edgesData, visibleNodeIds, selectedPath, backtrackEdges]);
+
+=========
+
+
+baseNodes
+
 const backtrackNodeSet = useMemo(() => {
   const set = new Set();
-
   backtrackEdges.forEach((e: any) => {
     set.add(e.source);
     set.add(e.target);
   });
-
   return set;
 }, [backtrackEdges]);
 
 
-
-
+===
 
 const baseNodes = useMemo(() => {
   return Array.from(visibleNodeIds).map((id) => {
     const node = nodeMap.get(id);
     const level = node?.level;
 
-    const isBacktrackNode = backtrackNodeSet.has(id);
+    const isBacktrack = backtrackNodeSet.has(id);
 
     return {
       id,
       data: { label: node?.label },
 
-      // 🔥 MAGIC HERE
-      sourcePosition: isBacktrackNode ? Position.Left : Position.Right,
-      targetPosition: isBacktrackNode ? Position.Right : Position.Left,
+      // 🔥 THIS FIXES YOUR UX
+      sourcePosition: isBacktrack ? Position.Left : Position.Right,
+      targetPosition: isBacktrack ? Position.Right : Position.Left,
 
       style: {
         padding: 10,
@@ -38,39 +141,3 @@ const baseNodes = useMemo(() => {
     };
   });
 }, [visibleNodeIds, nodeMap, backtrackNodeSet]);
-
-
-
-
-
-
-
-
-const backtrackEdgesStyled = backtrackEdges.map((e: any, i: number) => ({
-  id: `back-${i}`,
-
-  // 🔥 reverse direction
-  source: e.target,
-  target: e.source,
-
-  type: "smoothstep",
-  animated: true,
-  style: {
-    stroke: "#FF5733",
-    strokeWidth: 2.5
-  }
-}));
-
-
-
-
-
-
-
-
-
-
-
-style: {
-  strokeDasharray: "5,5" // dotted reverse flow
-}
