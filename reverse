@@ -1,26 +1,62 @@
-return {
-  ...e,
-  type: "smoothstep",
-  animated: isPathEdge || e.isReverse,
+if (isLeafNode(node.id)) {
+  setActiveReverseLeaf((prev) => {
+    const isSame = prev === node.id;
 
-  // 🔥 ONLY reverse edges get arrow
-  ...(e.isReverse && {
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: "#007bff",
-      width: 20,
-      height: 20
-    }
-  }),
+    // 🔥 If clicking same node again → remove reverse only
+    if (isSame) return null;
 
-  style: {
-    stroke: e.isReverse
-      ? "#007bff"
-      : isPathEdge
-        ? "red"
-        : "#bbb",
+    // 🔥 Build full reverse graph
+    const reverseEdges = buildReverseEdges(node.id);
 
-    strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
-    strokeDasharray: e.isReverse ? "5 5" : "0"
+    // 🔥 Make ALL parents visible
+    setVisibleNodeIds((prevVisible: any) => {
+      const updated = new Set(prevVisible);
+
+      reverseEdges.forEach((e: any) => {
+        updated.add(e.source);
+        updated.add(e.target);
+      });
+
+      return updated;
+    });
+
+    return node.id;
+  });
+
+  return;
+}
+
+
+
+======
+
+
+
+const reverseEdges = buildReverseEdges(activeReverseLeaf).map(
+  (e, i) => ({
+    id: `rev-${activeReverseLeaf}-${i}`,
+
+    // 🔥 FLIP direction
+    source: e.target,
+    target: e.source,
+
+    isReverse: true
+  })
+);
+
+
+
+========
+
+...(e.isReverse && {
+  markerStart: {
+    type: MarkerType.ArrowClosed,
+    color: "#007bff",
+    width: 20,
+    height: 20
   }
-};
+}),
+
+
+sourcePosition: Position.Right,
+targetPosition: Position.Left,
