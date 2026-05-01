@@ -1,28 +1,100 @@
-// 🔥 get dynamic columns in order
-const columns: string[] = Object.keys(cleanData[0] || {});
+const [activeReverseLeaf, setActiveReverseLeaf] = useState<string | null>(null);
 
-cleanData.forEach((raw: any) => {
-  const row = normalizeRow(raw);
 
-  let prevNodeId: string | null = null;
+const buildReverseEdges = (startNodeId: string) => {
+  const visited = new Set<string>();
+  const edges: { source: string; target: string }[] = [];
 
-  columns.forEach((col: string, level: number) => {
-    const value = row[col];
+  const dfs = (nodeId: string) => {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
 
-    // skip empty cells
-    if (!value) return;
+    const parents = parentMap[nodeId] || [];
 
-    // 🔥 hierarchical unique id
-    const nodeId = prevNodeId
-      ? `${prevNodeId}|${value}`
-      : value;
+    parents.forEach((p: string) => {
+      edges.push({ source: nodeId, target: p }); // reverse direction
+      dfs(p);
+    });
+  };
 
-    addNode(nodeId, level, value);
+  dfs(startNodeId);
 
-    if (prevNodeId) {
-      addEdge(prevNodeId, nodeId);
+  return edges;
+};
+
+
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
+
+    // =========================
+    // 🔴 LEAF NODE CLICK
+    // =========================
+    if (isLeafNode(node.id)) {
+      setActiveReverseLeaf((prev) =>
+        prev === node.id ? null : node.id
+      );
+      return;
     }
 
-    prevNodeId = nodeId;
-  });
-});
+    // =========================
+    // 🟢 NON-LEAF CLICK
+    // =========================
+    // remove reverse flow
+    setActiveReverseLeaf(null);
+
+    // 👇 KEEP YOUR EXISTING LOGIC BELOW UNCHANGED
+
+
+
+
+
+
+
+
+const edges = useMemo(() => {
+  let finalEdges: any[] = [...edgesData];
+
+  // 🔥 Add reverse edges if leaf selected
+  if (activeReverseLeaf) {
+    const reverseEdges = buildReverseEdges(activeReverseLeaf).map(
+      (e, i) => ({
+        id: `rev-${activeReverseLeaf}-${i}`,
+        ...e,
+        isReverse: true
+      })
+    );
+
+    finalEdges = [...finalEdges, ...reverseEdges];
+  }
+
+  return finalEdges
+    .filter(
+      (e: any) =>
+        visibleNodeIds.has(e.source) &&
+        visibleNodeIds.has(e.target)
+    )
+    .map((e: any) => {
+      const isPathEdge = selectedPath.some(
+        (nodeId: any, index: number) =>
+          selectedPath[index + 1] === e.target &&
+          nodeId === e.source
+      );
+
+      return {
+        ...e,
+        type: "smoothstep",
+        animated: isPathEdge || e.isReverse,
+
+        style: {
+          stroke: e.isReverse
+            ? "#007bff" // 🔵 reverse flow
+            : isPathEdge
+            ? "red"
+            : "#bbb",
+
+          strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
+          strokeDasharray: e.isReverse ? "5 5" : "0"
+        }
+      };
+    });
+}, [edgesData, visibleNodeIds, selectedPath, activeReverseLeaf]);
