@@ -1,73 +1,79 @@
-const [reverseMap, setReverseMap] = useState({});
+const [activeReverseNodes, setActiveReverseNodes] = useState(new Set());
 
 
 if (isLeafNode(node.id)) {
 
-  const existing = reverseMap[node.id];
-
-  // 🔴 CASE 1: Already expanded → REMOVE it
-  if (existing) {
-
-    setNodesData((prev) =>
-      prev.filter((n) => !existing.nodes.some(rn => rn.id === n.id))
-    );
-
-    setEdgesData((prev) =>
-      prev.filter((e) => !existing.edges.some(re => re.id === e.id))
-    );
-
-    setVisibleNodeIds((prev) => {
-      const updated = new Set(prev);
-      existing.nodes.forEach((n) => updated.delete(n.id));
-      return updated;
-    });
-
-    setReverseMap((prev) => {
-      const copy = { ...prev };
-      delete copy[node.id];
-      return copy;
-    });
-
-    setActiveNode(null);
-    return;
-  }
-
-  // 🟢 CASE 2: Not expanded → ADD it
-
-  const reverseGraph = buildReverseGraph(node.id);
-
-  const newEdges = reverseGraph.edges.map((e, i) => ({
-    id: `rev-${node.id}-${i}`,
-    ...e,
-    isReverse: true
-  }));
-
-  setNodesData((prev) => {
-    const existingIds = new Set(prev.map((n) => n.id));
-    const filtered = reverseGraph.nodes.filter(
-      (n) => !existingIds.has(n.id)
-    );
-    return [...prev, ...filtered];
-  });
-
-  setEdgesData((prev) => [...prev, ...newEdges]);
-
-  setVisibleNodeIds((prev) => {
+  setActiveReverseNodes((prev) => {
     const updated = new Set(prev);
-    reverseGraph.nodes.forEach((n) => updated.add(n.id));
+
+    if (updated.has(node.id)) {
+      // 🔴 toggle OFF → remove highlight only
+      updated.delete(node.id);
+    } else {
+      // 🟢 toggle ON → ensure reverse edges exist
+      const reverseGraph = buildReverseGraph(node.id);
+
+      const newEdges = reverseGraph.edges.map((e, i) => ({
+        id: `rev-${node.id}-${i}`,
+        ...e,
+        isReverse: true,
+        parentLeaf: node.id // 🔥 important
+      }));
+
+      setEdgesData((prevEdges) => {
+        const existing = new Set(prevEdges.map(e => e.id));
+        const filtered = newEdges.filter(e => !existing.has(e.id));
+        return [...prevEdges, ...filtered];
+      });
+
+      // ❗ DO NOT touch nodesData or visibleNodeIds
+      updated.add(node.id);
+    }
+
     return updated;
   });
 
-  // 🔥 store it for toggle
-  setReverseMap((prev) => ({
-    ...prev,
-    [node.id]: {
-      nodes: reverseGraph.nodes,
-      edges: newEdges
-    }
-  }));
-
   setActiveNode(node.id);
-
   return;
 }
+
+
+
+const edges = useMemo(() => {
+  return edgesData
+    .filter((e) => {
+      // 🔥 hide reverse edges if not active
+      if (e.isReverse && !activeReverseNodes.has(e.parentLeaf)) {
+        return false;
+      }
+
+      return (
+        visibleNodeIds.has(e.source) &&
+        visibleNodeIds.has(e.target)
+      );
+    })
+    .map((e) => {
+      const isPathEdge =
+        selectedPath.includes(e.source) &&
+        selectedPath.includes(e.target);
+
+      return {
+        ...e,
+        type: "smoothstep",
+        animated:
+          activeNode &&
+          (e.source === activeNode || e.target === activeNode),
+
+        style: {
+          stroke: e.isReverse
+            ? "#007bff"   // 🔵 reverse
+            : isPathEdge
+            ? "red"
+            : "#999",
+
+          strokeWidth: e.isReverse ? 2 : 1.5,
+          strokeDasharray: e.isReverse ? "5 5" : "0"
+        }
+      };
+    });
+}, [edgesData, visibleNodeIds, activeNode, selectedPath, activeReverseNodes]);
