@@ -1,47 +1,50 @@
-if (isLeafNode(node.id)) {
+...newEdges.map((e, i) => ({
+  id: `rev-${Date.now()}-${i}`,
+  ...e,
+  isReverse: true // 🔥 IMPORTANT FLAG
+}))
 
-  const reverseGraph = buildReverseGraph(node.id);
 
-  // ✅ Append nodes (avoid duplicates)
-  setNodesData((prev) => {
-    const existingIds = new Set(prev.map((n) => n.id));
+======
 
-    const newNodes = reverseGraph.nodes.filter(
-      (n) => !existingIds.has(n.id)
-    );
 
-    return [...prev, ...newNodes];
-  });
+.map((e: any) => ({
+  ...e,
+  type: "smoothstep",
+  animated:
+    activeNode &&
+    (e.source === activeNode || e.target === activeNode)
+}));
 
-  // ✅ Append edges (avoid duplicates)
-  setEdgesData((prev) => {
-    const existingEdges = new Set(
-      prev.map((e) => `${e.source}->${e.target}`)
-    );
+-->>>
 
-    const newEdges = reverseGraph.edges.filter(
-      (e) => !existingEdges.has(`${e.source}->${e.target}`)
-    );
+.map((e: any) => {
+  const isPathEdge =
+    selectedPath.includes(e.source) &&
+    selectedPath.includes(e.target);
 
-    return [
-      ...prev,
-      ...newEdges.map((e, i) => ({
-        id: `rev-${Date.now()}-${i}`,
-        ...e
-      }))
-    ];
-  });
+  return {
+    ...e,
+    type: "smoothstep",
 
-  // ✅ Make them visible
-  setVisibleNodeIds((prev) => {
-    const updated = new Set(prev);
+    animated:
+      activeNode &&
+      (e.source === activeNode || e.target === activeNode),
 
-    reverseGraph.nodes.forEach((n) => updated.add(n.id));
+    style: {
+      stroke: e.isReverse
+        ? "#007bff" // 🔵 reverse flow color
+        : isPathEdge
+        ? "red"     // 🔴 selected path
+        : "#999",
 
-    return updated;
-  });
+      strokeWidth: e.isReverse ? 2 : 1.5,
 
-  setActiveNode(node.id);
+      strokeDasharray: e.isReverse ? "5 5" : "0"
+    }
+  };
+});
 
-  return;
-}
+
+=======
+
