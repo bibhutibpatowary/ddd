@@ -1,100 +1,25 @@
-const [activeReverseLeaf, setActiveReverseLeaf] = useState<string | null>(null);
+return {
+  ...e,
+  type: "smoothstep",
 
+  animated: isPathEdge || e.isReverse,
 
-const buildReverseEdges = (startNodeId: string) => {
-  const visited = new Set<string>();
-  const edges: { source: string; target: string }[] = [];
+  // 🔥 KEY CHANGE HERE
+  sourcePosition: e.isReverse ? Position.Left : Position.Right,
+  targetPosition: e.isReverse ? Position.Right : Position.Left,
 
-  const dfs = (nodeId: string) => {
-    if (visited.has(nodeId)) return;
-    visited.add(nodeId);
+  markerEnd: {
+    type: "arrowclosed"
+  },
 
-    const parents = parentMap[nodeId] || [];
+  style: {
+    stroke: e.isReverse
+      ? "#007bff" // reverse flow
+      : isPathEdge
+      ? "red"
+      : "#bbb",
 
-    parents.forEach((p: string) => {
-      edges.push({ source: nodeId, target: p }); // reverse direction
-      dfs(p);
-    });
-  };
-
-  dfs(startNodeId);
-
-  return edges;
-};
-
-
-const onNodeClick = useCallback(
-  (_: any, node: any) => {
-
-    // =========================
-    // 🔴 LEAF NODE CLICK
-    // =========================
-    if (isLeafNode(node.id)) {
-      setActiveReverseLeaf((prev) =>
-        prev === node.id ? null : node.id
-      );
-      return;
-    }
-
-    // =========================
-    // 🟢 NON-LEAF CLICK
-    // =========================
-    // remove reverse flow
-    setActiveReverseLeaf(null);
-
-    // 👇 KEEP YOUR EXISTING LOGIC BELOW UNCHANGED
-
-
-
-
-
-
-
-
-const edges = useMemo(() => {
-  let finalEdges: any[] = [...edgesData];
-
-  // 🔥 Add reverse edges if leaf selected
-  if (activeReverseLeaf) {
-    const reverseEdges = buildReverseEdges(activeReverseLeaf).map(
-      (e, i) => ({
-        id: `rev-${activeReverseLeaf}-${i}`,
-        ...e,
-        isReverse: true
-      })
-    );
-
-    finalEdges = [...finalEdges, ...reverseEdges];
+    strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
+    strokeDasharray: e.isReverse ? "5 5" : "0"
   }
-
-  return finalEdges
-    .filter(
-      (e: any) =>
-        visibleNodeIds.has(e.source) &&
-        visibleNodeIds.has(e.target)
-    )
-    .map((e: any) => {
-      const isPathEdge = selectedPath.some(
-        (nodeId: any, index: number) =>
-          selectedPath[index + 1] === e.target &&
-          nodeId === e.source
-      );
-
-      return {
-        ...e,
-        type: "smoothstep",
-        animated: isPathEdge || e.isReverse,
-
-        style: {
-          stroke: e.isReverse
-            ? "#007bff" // 🔵 reverse flow
-            : isPathEdge
-            ? "red"
-            : "#bbb",
-
-          strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
-          strokeDasharray: e.isReverse ? "5 5" : "0"
-        }
-      };
-    });
-}, [edgesData, visibleNodeIds, selectedPath, activeReverseLeaf]);
+};
