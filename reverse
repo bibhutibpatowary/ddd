@@ -1,50 +1,73 @@
-...newEdges.map((e, i) => ({
-  id: `rev-${Date.now()}-${i}`,
-  ...e,
-  isReverse: true // 🔥 IMPORTANT FLAG
-}))
+const [reverseMap, setReverseMap] = useState({});
 
 
-======
+if (isLeafNode(node.id)) {
 
+  const existing = reverseMap[node.id];
 
-.map((e: any) => ({
-  ...e,
-  type: "smoothstep",
-  animated:
-    activeNode &&
-    (e.source === activeNode || e.target === activeNode)
-}));
+  // 🔴 CASE 1: Already expanded → REMOVE it
+  if (existing) {
 
--->>>
+    setNodesData((prev) =>
+      prev.filter((n) => !existing.nodes.some(rn => rn.id === n.id))
+    );
 
-.map((e: any) => {
-  const isPathEdge =
-    selectedPath.includes(e.source) &&
-    selectedPath.includes(e.target);
+    setEdgesData((prev) =>
+      prev.filter((e) => !existing.edges.some(re => re.id === e.id))
+    );
 
-  return {
+    setVisibleNodeIds((prev) => {
+      const updated = new Set(prev);
+      existing.nodes.forEach((n) => updated.delete(n.id));
+      return updated;
+    });
+
+    setReverseMap((prev) => {
+      const copy = { ...prev };
+      delete copy[node.id];
+      return copy;
+    });
+
+    setActiveNode(null);
+    return;
+  }
+
+  // 🟢 CASE 2: Not expanded → ADD it
+
+  const reverseGraph = buildReverseGraph(node.id);
+
+  const newEdges = reverseGraph.edges.map((e, i) => ({
+    id: `rev-${node.id}-${i}`,
     ...e,
-    type: "smoothstep",
+    isReverse: true
+  }));
 
-    animated:
-      activeNode &&
-      (e.source === activeNode || e.target === activeNode),
+  setNodesData((prev) => {
+    const existingIds = new Set(prev.map((n) => n.id));
+    const filtered = reverseGraph.nodes.filter(
+      (n) => !existingIds.has(n.id)
+    );
+    return [...prev, ...filtered];
+  });
 
-    style: {
-      stroke: e.isReverse
-        ? "#007bff" // 🔵 reverse flow color
-        : isPathEdge
-        ? "red"     // 🔴 selected path
-        : "#999",
+  setEdgesData((prev) => [...prev, ...newEdges]);
 
-      strokeWidth: e.isReverse ? 2 : 1.5,
+  setVisibleNodeIds((prev) => {
+    const updated = new Set(prev);
+    reverseGraph.nodes.forEach((n) => updated.add(n.id));
+    return updated;
+  });
 
-      strokeDasharray: e.isReverse ? "5 5" : "0"
+  // 🔥 store it for toggle
+  setReverseMap((prev) => ({
+    ...prev,
+    [node.id]: {
+      nodes: reverseGraph.nodes,
+      edges: newEdges
     }
-  };
-});
+  }));
 
+  setActiveNode(node.id);
 
-=======
-
+  return;
+}
