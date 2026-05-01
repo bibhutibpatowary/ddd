@@ -1,68 +1,41 @@
-const onNodeClick = useCallback(
-  (_: any, node: any) => {
+// 🔥 get dynamic columns
+const columns = Object.keys(cleanData[0] || {});
 
-    // =========================
-    // 🔴 LEAF NODE LOGIC (FULLY ISOLATED)
-    // =========================
-    if (isLeafNode(node.id)) {
+// 🔥 merge Source + Consuming into single logical column
+const processedColumns = columns.map((col) =>
+  col === "Source" || col === "Consuming" ? "Role" : col
+);
 
-      setActiveReverseNodes((prev) => {
-        const updated = new Set(prev);
+// remove duplicates (because Source & Consuming both become Role)
+const uniqueColumns = [...new Set(processedColumns)];
 
-        if (updated.has(node.id)) {
-          // 🔴 Toggle OFF → just remove reverse edges
-          updated.delete(node.id);
-        } else {
-          // 🟢 Toggle ON → add reverse edges if not already
-          const reverseGraph = buildReverseGraph(node.id);
+cleanData.forEach((raw: any) => {
+  const row = normalizeRow(raw);
 
-          const newEdges = reverseGraph.edges.map((e, i) => ({
-            id: `rev-${node.id}-${i}`,
-            ...e,
-            isReverse: true,
-            parentLeaf: node.id
-          }));
+  let prevNodeId: string | null = null;
 
-          setEdgesData((prevEdges) => {
-            const existing = new Set(prevEdges.map(e => e.id));
-            const filtered = newEdges.filter(e => !existing.has(e.id));
-            return [...prevEdges, ...filtered];
-          });
+  uniqueColumns.forEach((col, level) => {
+    let value = "";
 
-          updated.add(node.id);
-        }
-
-        return updated;
-      });
-
-      setActiveNode(node.id);
-
-      // 🔥 CRITICAL: STOP HERE
-      return;
+    if (col === "Role") {
+      value = row.Source ? "Source" : row.Consuming ? "Consuming" : "";
+    } else {
+      value = row[col];
     }
 
-    // =========================
-    // 🟢 NORMAL NODE LOGIC
-    // =========================
+    if (!value) return;
 
-    const children = childrenMap[node.id] || [];
-    const ancestors = getAllAncestors(node.id);
+    // 🔥 build unique hierarchical id
+    const nodeId = prevNodeId
+      ? `${prevNodeId}|${value}`
+      : value;
 
-    const newVisible: any = new Set();
+    addNode(nodeId, level, value);
 
-    // keep all Domain nodes always visible
-    nodesData.forEach((n: any) => {
-      if (n.level === 0) {
-        newVisible.add(n.id);
-      }
-    });
+    if (prevNodeId) {
+      addEdge(prevNodeId, nodeId);
+    }
 
-    ancestors.forEach((a) => newVisible.add(a));
-    newVisible.add(node.id);
-    children.forEach((c: any) => newVisible.add(c));
-
-    setVisibleNodeIds(newVisible);
-    setActiveNode(node.id);
-  },
-  [childrenMap, nodesData]
-);
+    prevNodeId = nodeId;
+  });
+});
