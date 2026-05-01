@@ -1,79 +1,68 @@
-const [activeReverseNodes, setActiveReverseNodes] = useState(new Set());
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
 
+    // =========================
+    // 🔴 LEAF NODE LOGIC (FULLY ISOLATED)
+    // =========================
+    if (isLeafNode(node.id)) {
 
-if (isLeafNode(node.id)) {
+      setActiveReverseNodes((prev) => {
+        const updated = new Set(prev);
 
-  setActiveReverseNodes((prev) => {
-    const updated = new Set(prev);
+        if (updated.has(node.id)) {
+          // 🔴 Toggle OFF → just remove reverse edges
+          updated.delete(node.id);
+        } else {
+          // 🟢 Toggle ON → add reverse edges if not already
+          const reverseGraph = buildReverseGraph(node.id);
 
-    if (updated.has(node.id)) {
-      // 🔴 toggle OFF → remove highlight only
-      updated.delete(node.id);
-    } else {
-      // 🟢 toggle ON → ensure reverse edges exist
-      const reverseGraph = buildReverseGraph(node.id);
+          const newEdges = reverseGraph.edges.map((e, i) => ({
+            id: `rev-${node.id}-${i}`,
+            ...e,
+            isReverse: true,
+            parentLeaf: node.id
+          }));
 
-      const newEdges = reverseGraph.edges.map((e, i) => ({
-        id: `rev-${node.id}-${i}`,
-        ...e,
-        isReverse: true,
-        parentLeaf: node.id // 🔥 important
-      }));
+          setEdgesData((prevEdges) => {
+            const existing = new Set(prevEdges.map(e => e.id));
+            const filtered = newEdges.filter(e => !existing.has(e.id));
+            return [...prevEdges, ...filtered];
+          });
 
-      setEdgesData((prevEdges) => {
-        const existing = new Set(prevEdges.map(e => e.id));
-        const filtered = newEdges.filter(e => !existing.has(e.id));
-        return [...prevEdges, ...filtered];
+          updated.add(node.id);
+        }
+
+        return updated;
       });
 
-      // ❗ DO NOT touch nodesData or visibleNodeIds
-      updated.add(node.id);
+      setActiveNode(node.id);
+
+      // 🔥 CRITICAL: STOP HERE
+      return;
     }
 
-    return updated;
-  });
+    // =========================
+    // 🟢 NORMAL NODE LOGIC
+    // =========================
 
-  setActiveNode(node.id);
-  return;
-}
+    const children = childrenMap[node.id] || [];
+    const ancestors = getAllAncestors(node.id);
 
+    const newVisible: any = new Set();
 
-
-const edges = useMemo(() => {
-  return edgesData
-    .filter((e) => {
-      // 🔥 hide reverse edges if not active
-      if (e.isReverse && !activeReverseNodes.has(e.parentLeaf)) {
-        return false;
+    // keep all Domain nodes always visible
+    nodesData.forEach((n: any) => {
+      if (n.level === 0) {
+        newVisible.add(n.id);
       }
-
-      return (
-        visibleNodeIds.has(e.source) &&
-        visibleNodeIds.has(e.target)
-      );
-    })
-    .map((e) => {
-      const isPathEdge =
-        selectedPath.includes(e.source) &&
-        selectedPath.includes(e.target);
-
-      return {
-        ...e,
-        type: "smoothstep",
-        animated:
-          activeNode &&
-          (e.source === activeNode || e.target === activeNode),
-
-        style: {
-          stroke: e.isReverse
-            ? "#007bff"   // 🔵 reverse
-            : isPathEdge
-            ? "red"
-            : "#999",
-
-          strokeWidth: e.isReverse ? 2 : 1.5,
-          strokeDasharray: e.isReverse ? "5 5" : "0"
-        }
-      };
     });
-}, [edgesData, visibleNodeIds, activeNode, selectedPath, activeReverseNodes]);
+
+    ancestors.forEach((a) => newVisible.add(a));
+    newVisible.add(node.id);
+    children.forEach((c: any) => newVisible.add(c));
+
+    setVisibleNodeIds(newVisible);
+    setActiveNode(node.id);
+  },
+  [childrenMap, nodesData]
+);
