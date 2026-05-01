@@ -1,34 +1,17 @@
-markerEnd: {
-  type: "arrowclosed"
-}
-
-
-
-markerEnd: {
-  type: MarkerType.ArrowClosed,
-  color: e.isReverse ? "#007bff" : isPathEdge ? "red" : "#bbb",
-  width: 20,
-  height: 20
-}
-
-=======
-
 return {
   ...e,
   type: "smoothstep",
-
   animated: isPathEdge || e.isReverse,
 
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    color: e.isReverse
-      ? "#007bff"
-      : isPathEdge
-        ? "red"
-        : "#bbb",
-    width: 20,
-    height: 20
-  },
+  // 🔥 ONLY reverse edges get arrow
+  ...(e.isReverse && {
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      color: "#007bff",
+      width: 20,
+      height: 20
+    }
+  }),
 
   style: {
     stroke: e.isReverse
