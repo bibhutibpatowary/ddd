@@ -1,25 +1,76 @@
-return {
-  ...e,
+const backtrackNodeSet = useMemo(() => {
+  const set = new Set();
+
+  backtrackEdges.forEach((e: any) => {
+    set.add(e.source);
+    set.add(e.target);
+  });
+
+  return set;
+}, [backtrackEdges]);
+
+
+
+
+
+const baseNodes = useMemo(() => {
+  return Array.from(visibleNodeIds).map((id) => {
+    const node = nodeMap.get(id);
+    const level = node?.level;
+
+    const isBacktrackNode = backtrackNodeSet.has(id);
+
+    return {
+      id,
+      data: { label: node?.label },
+
+      // 🔥 MAGIC HERE
+      sourcePosition: isBacktrackNode ? Position.Left : Position.Right,
+      targetPosition: isBacktrackNode ? Position.Right : Position.Left,
+
+      style: {
+        padding: 10,
+        borderRadius: 8,
+        border: `2px solid ${LEVEL_COLORS[level]}`,
+        background: LEVEL_COLORS[level],
+        color: "#fff"
+      }
+    };
+  });
+}, [visibleNodeIds, nodeMap, backtrackNodeSet]);
+
+
+
+
+
+
+
+
+const backtrackEdgesStyled = backtrackEdges.map((e: any, i: number) => ({
+  id: `back-${i}`,
+
+  // 🔥 reverse direction
+  source: e.target,
+  target: e.source,
+
   type: "smoothstep",
-
-  animated: isPathEdge || e.isReverse,
-
-  // 🔥 KEY CHANGE HERE
-  sourcePosition: e.isReverse ? Position.Left : Position.Right,
-  targetPosition: e.isReverse ? Position.Right : Position.Left,
-
-  markerEnd: {
-    type: "arrowclosed"
-  },
-
+  animated: true,
   style: {
-    stroke: e.isReverse
-      ? "#007bff" // reverse flow
-      : isPathEdge
-      ? "red"
-      : "#bbb",
-
-    strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
-    strokeDasharray: e.isReverse ? "5 5" : "0"
+    stroke: "#FF5733",
+    strokeWidth: 2.5
   }
-};
+}));
+
+
+
+
+
+
+
+
+
+
+
+style: {
+  strokeDasharray: "5,5" // dotted reverse flow
+}
