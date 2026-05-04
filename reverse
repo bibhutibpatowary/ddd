@@ -1,47 +1,12 @@
-setVisibleNodeIds((prev: any) => {
-  const updated = new Set(prev);
+if (nodeData.level === 0) {
+  setActiveReverseLeaf(null);
 
-  const areChildrenVisible = children.every((c: any) =>
-    updated.has(c)
-  );
+  currentDomain = nodeData.label;
+  setSelectedDomain(currentDomain);
 
-  if (areChildrenVisible) {
-    const descendants = getAllDescendants(node.id, childrenMap);
-
-    descendants.forEach((d: any) => updated.delete(d));
-    children.forEach((c: any) => updated.delete(c));
-
-  } else {
-    children.forEach((c: any) => updated.add(c));
-  }
-
-  return updated;
-});
-
-===========
-
-
-const columns: string[] = Object.keys(cleanData[0] || {});
-
-cleanData.forEach((raw: any) => {
-  const row = normalizeRow(raw);
-
-  let prevNodeId: string | null = null;
-
-  columns.forEach((col: string, level: number) => {
-    const value = row[col];
-    if (!value) return;
-
-    const nodeId = prevNodeId
-      ? `${prevNodeId}|${value}`
-      : value;
-
-    addNode(nodeId, level, value);
-
-    if (prevNodeId) {
-      addEdge(prevNodeId, nodeId);
-    }
-
-    prevNodeId = nodeId;
+  setSelectedPath((prev: any) => {
+    const index = prev.indexOf(node.id);
+    if (index !== -1) return prev.slice(0, index + 1);
+    return [...prev, node.id];
   });
-});
+}
