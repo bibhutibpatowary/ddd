@@ -1,20 +1,25 @@
-if (nodeData.level === 0) {
-  // 🔥 RESET EVERYTHING (important)
-  setActiveReverseLeaf(null);
+setVisibleNodeIds((prev: any) => {
+  const updated = new Set(prev);
 
-  currentDomain = nodeData.label;
-  setSelectedDomain(currentDomain);
-  setSelectedPath([node.id]);
+  const children = childrenMap[node.id] || [];
 
-  // 🔥 Show ONLY roots + this domain
-  setVisibleNodeIds(() => {
-    const roots = nodesData
-      .filter((n: any) => n.level === 0)
-      .map((n: any) => n.id);
+  const areChildrenVisible = children.every((c: any) =>
+    updated.has(c)
+  );
 
-    return new Set(roots);
-  });
+  if (areChildrenVisible) {
+    // 🔥 Collapse ONLY this branch
+    const descendants = getAllDescendants(node.id, childrenMap);
 
-  setActiveNode(node.id);
-  return; // 🔥 stop further logic
-}
+    descendants.forEach((d: any) => updated.delete(d));
+
+    // also remove direct children
+    children.forEach((c: any) => updated.delete(c));
+
+  } else {
+    // 🔥 Expand ONLY this branch
+    children.forEach((c: any) => updated.add(c));
+  }
+
+  return updated;
+});
