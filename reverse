@@ -1,62 +1,20 @@
-if (isLeafNode(node.id)) {
-  setActiveReverseLeaf((prev) => {
-    const isSame = prev === node.id;
+if (nodeData.level === 0) {
+  // 🔥 RESET EVERYTHING (important)
+  setActiveReverseLeaf(null);
 
-    // 🔥 If clicking same node again → remove reverse only
-    if (isSame) return null;
+  currentDomain = nodeData.label;
+  setSelectedDomain(currentDomain);
+  setSelectedPath([node.id]);
 
-    // 🔥 Build full reverse graph
-    const reverseEdges = buildReverseEdges(node.id);
+  // 🔥 Show ONLY roots + this domain
+  setVisibleNodeIds(() => {
+    const roots = nodesData
+      .filter((n: any) => n.level === 0)
+      .map((n: any) => n.id);
 
-    // 🔥 Make ALL parents visible
-    setVisibleNodeIds((prevVisible: any) => {
-      const updated = new Set(prevVisible);
-
-      reverseEdges.forEach((e: any) => {
-        updated.add(e.source);
-        updated.add(e.target);
-      });
-
-      return updated;
-    });
-
-    return node.id;
+    return new Set(roots);
   });
 
-  return;
+  setActiveNode(node.id);
+  return; // 🔥 stop further logic
 }
-
-
-
-======
-
-
-
-const reverseEdges = buildReverseEdges(activeReverseLeaf).map(
-  (e, i) => ({
-    id: `rev-${activeReverseLeaf}-${i}`,
-
-    // 🔥 FLIP direction
-    source: e.target,
-    target: e.source,
-
-    isReverse: true
-  })
-);
-
-
-
-========
-
-...(e.isReverse && {
-  markerStart: {
-    type: MarkerType.ArrowClosed,
-    color: "#007bff",
-    width: 20,
-    height: 20
-  }
-}),
-
-
-sourcePosition: Position.Right,
-targetPosition: Position.Left,
