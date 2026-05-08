@@ -1,5 +1,5 @@
-still not helping, let me share my whole code and you figure out where is the issue, basically everything is correct just that in reverse flow that blue dotted line should enter the parent from right side and exit the arrow from left side import React, { useState, useMemo, useCallback } from "react";
-import ReactFlow, { Background, Controls, Position } from "reactflow";
+import React, { useState, useMemo, useCallback } from "react";
+import ReactFlow, { Background, Controls, Position, MarkerType } from "reactflow";
 import dagre from "dagre";
 import * as XLSX from "xlsx";
 import "reactflow/dist/style.css";
@@ -235,7 +235,11 @@ export default function GraphFlow() {
       const reverseEdges = buildReverseEdges(activeReverseLeaf).map(
         (e, i) => ({
           id: `rev-${activeReverseLeaf}-${i}`,
-          ...e,
+
+          // 🔥 FLIP direction
+          source: e.target,
+          target: e.source,
+
           isReverse: true
         })
       );
@@ -259,20 +263,21 @@ export default function GraphFlow() {
         return {
           ...e,
           type: "smoothstep",
-
           animated: isPathEdge || e.isReverse,
 
-          // 🔥 KEY CHANGE HERE
-          sourcePosition: e.isReverse ? Position.Left : Position.Right,
-          targetPosition: e.isReverse ? Position.Right : Position.Left,
-
-          markerEnd: {
-            type: "arrowclosed"
-          },
+          // 🔥 ONLY reverse edges get arrow
+          ...(e.isReverse && {
+            markerStart: {
+              type: MarkerType.ArrowClosed,
+              color: "#007bff",
+              width: 20,
+              height: 20
+            }
+          }),
 
           style: {
             stroke: e.isReverse
-              ? "#007bff" // reverse flow
+              ? "#007bff"
               : isPathEdge
                 ? "red"
                 : "#bbb",
@@ -308,9 +313,30 @@ export default function GraphFlow() {
   const onNodeClick = useCallback(
     (_: any, node: any) => {
       if (isLeafNode(node.id)) {
-        setActiveReverseLeaf((prev) =>
-          prev === node.id ? null : node.id
-        );
+        setActiveReverseLeaf((prev) => {
+          const isSame = prev === node.id;
+
+          // 🔥 If clicking same node again → remove reverse only
+          if (isSame) return null;
+
+          // 🔥 Build full reverse graph
+          const reverseEdges = buildReverseEdges(node.id);
+
+          // 🔥 Make ALL parents visible
+          setVisibleNodeIds((prevVisible: any) => {
+            const updated = new Set(prevVisible);
+
+            reverseEdges.forEach((e: any) => {
+              updated.add(e.source);
+              updated.add(e.target);
+            });
+
+            return updated;
+          });
+
+          return node.id;
+        });
+
         return;
       }
 
@@ -416,239 +442,3 @@ export default function GraphFlow() {
     </div>
   );
 }
-
-========================================
-
-const reverseEdges = buildReverseEdges(activeReverseLeaf).map(
-  (e, i) => ({
-    id: `rev-${activeReverseLeaf}-${i}`,
-
-    // 🔥 FLIP SOURCE & TARGET
-    source: e.target,
-    target: e.source,
-
-    isReverse: true
-  })
-);
-
-======================================
-
-sourcePosition: e.isReverse ? Position.Left : Position.Right,
-targetPosition: e.isReverse ? Position.Right : Position.Left,
-
-remove the above
-
-============================
-
-
-markerEnd: {
-  type: "arrowclosed",
-  color: "#007bff"
-},
-
-====================
-
-
-
-===================
-
-import ReactFlow, { Background, Controls, Position, MarkerType } from "reactflow";
-
-
-markerEnd: {
-  type: MarkerType.ArrowClosed,
-  color: e.isReverse ? "#007bff" : isPathEdge ? "red" : "#bbb",
-  width: 20,
-  height: 20
-}
-
-
-
-
-
-return {
-  ...e,
-  type: "smoothstep",
-
-  animated: isPathEdge || e.isReverse,
-
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    color: e.isReverse
-      ? "#007bff"
-      : isPathEdge
-        ? "red"
-        : "#bbb",
-    width: 20,
-    height: 20
-  },
-
-  style: {
-    stroke: e.isReverse
-      ? "#007bff"
-      : isPathEdge
-        ? "red"
-        : "#bbb",
-
-    strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
-    strokeDasharray: e.isReverse ? "5 5" : "0"
-  }
-};
-
-
-
-
-=====================
-
-
-return {
-  ...e,
-  type: "smoothstep",
-  animated: isPathEdge || e.isReverse,
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-    ...
-  },
-  style: { ... }
-};
-
-
-return {
-  ...e,
-  type: "smoothstep",
-  animated: isPathEdge || e.isReverse,
-
-  // 🔥 ONLY reverse edges get arrow
-  ...(e.isReverse && {
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: "#007bff",
-      width: 20,
-      height: 20
-    }
-  }),
-
-  style: {
-    stroke: e.isReverse
-      ? "#007bff"
-      : isPathEdge
-        ? "red"
-        : "#bbb",
-
-    strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
-    strokeDasharray: e.isReverse ? "5 5" : "0"
-  }
-};
-
-
-==================
-...(e.isReverse && {
-  markerStart: {
-    type: MarkerType.ArrowClosed,
-    color: "#007bff",
-    width: 20,
-    height: 20
-  }
-}),
-
-======
-
-
-if (isLeafNode(node.id)) {
-  setActiveReverseLeaf((prev) =>
-    prev === node.id ? null : node.id
-  );
-  return;
-}
-
-if (isLeafNode(node.id)) {
-  setActiveReverseLeaf((prev) =>
-    prev === node.id ? null : node.id
-  );
-
-  // 🔥 Ensure all parents become visible
-  const reverseEdges = buildReverseEdges(node.id);
-
-  setVisibleNodeIds((prev: any) => {
-    const updated = new Set(prev);
-
-    reverseEdges.forEach((e: any) => {
-      updated.add(e.source);
-      updated.add(e.target);
-    });
-
-    return updated;
-  });
-
-  return;
-}
-
-==========
-
-if (isLeafNode(node.id)) {
-  setActiveReverseLeaf((prev) =>
-    prev === node.id ? null : node.id
-  );
-  return;
-}
-
-
-
-if (isLeafNode(node.id)) {
-  setActiveReverseLeaf((prev) => {
-    const isSame = prev === node.id;
-
-    // 🔥 If clicking same node again → remove reverse only
-    if (isSame) return null;
-
-    // 🔥 Build full reverse graph
-    const reverseEdges = buildReverseEdges(node.id);
-
-    // 🔥 Make ALL parents visible
-    setVisibleNodeIds((prevVisible: any) => {
-      const updated = new Set(prevVisible);
-
-      reverseEdges.forEach((e: any) => {
-        updated.add(e.source);
-        updated.add(e.target);
-      });
-
-      return updated;
-    });
-
-    return node.id;
-  });
-
-  return;
-}
-
-
-
-
-const reverseEdges = buildReverseEdges(activeReverseLeaf).map(
-  (e, i) => ({
-    id: `rev-${activeReverseLeaf}-${i}`,
-
-    // 🔥 FLIP direction
-    source: e.target,
-    target: e.source,
-
-    isReverse: true
-  })
-);
-
-
-
-...(e.isReverse && {
-  markerStart: {
-    type: MarkerType.ArrowClosed,
-    color: "#007bff",
-    width: 20,
-    height: 20
-  }
-}),
-
-
-
-sourcePosition: Position.Right,
-targetPosition: Position.Left,
