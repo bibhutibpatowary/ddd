@@ -1,12 +1,42 @@
-if (nodeData.level === 0) {
-  setActiveReverseLeaf(null);
+const COLORS = [
+  "#4A90E2",
+  "#9B59B6",
+  "#F39C12",
+  "#1ABC9C",
+  "#2ECC71",
+  "#E67E22",
+  "#F1C40F",
+  "#95A5A6",
+  "#E84393",
+  "#00CEC9"
+];
 
-  currentDomain = nodeData.label;
-  setSelectedDomain(currentDomain);
+const baseColor = COLORS[level % COLORS.length];
 
-  setSelectedPath((prev: any) => {
-    const index = prev.indexOf(node.id);
-    if (index !== -1) return prev.slice(0, index + 1);
-    return [...prev, node.id];
+======
+
+const columns: string[] = Object.keys(cleanData[0] || {});
+
+cleanData.forEach((raw: any) => {
+  const row = normalizeRow(raw);
+
+  let prevNodeId: string | null = null;
+
+  columns.forEach((col: string, level: number) => {
+    const value = row[col];
+
+    if (!value) return;
+
+    const nodeId = prevNodeId
+      ? `${prevNodeId}|${value}`
+      : value;
+
+    addNode(nodeId, level, value);
+
+    if (prevNodeId) {
+      addEdge(prevNodeId, nodeId);
+    }
+
+    prevNodeId = nodeId;
   });
-}
+});
