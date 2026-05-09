@@ -1,49 +1,46 @@
-if (isLeafNode(node.id)) {
+const nodeId = value.trim();
 
-  setActiveReverseLeaf((prev) => {
-    const isSame = prev === node.id;
 
-    // remove reverse selection only
-    if (isSame) {
-      return null;
+
+
+const nodesMap = new Map();
+const edgesSet = new Set();
+
+const columns: string[] = Object.keys(cleanData[0] || {});
+
+const addNode = (id: string, level: number) => {
+  if (!nodesMap.has(id)) {
+    nodesMap.set(id, {
+      id,
+      label: id,
+      level
+    });
+  }
+};
+
+const addEdge = (source: string, target: string) => {
+  edgesSet.add(`${source}->${target}`);
+};
+
+cleanData.forEach((raw: any) => {
+  const row = normalizeRow(raw);
+
+  let prevNodeId: string | null = null;
+
+  columns.forEach((col: string, level: number) => {
+    const value = String(row[col] || "").trim();
+
+    if (!value) return;
+
+    // 🔥 SAME NODE SHARED GLOBALLY
+    const nodeId = value;
+
+    addNode(nodeId, level);
+
+    if (prevNodeId) {
+      addEdge(prevNodeId, nodeId);
     }
 
-    // 🔥 build full reverse hierarchy
-    const reverseEdges = buildReverseEdges(node.id);
-
-    // 🔥 auto-open ALL reverse parent nodes
-    setVisibleNodeIds((prevVisible: any) => {
-      const updated = new Set(prevVisible);
-
-      reverseEdges.forEach((e: any) => {
-        updated.add(e.source);
-        updated.add(e.target);
-      });
-
-      // 🔥 recursively ensure all ancestors visible
-      const openParentsRecursively = (currentId: string) => {
-        const parents = parentMap[currentId] || [];
-
-        parents.forEach((p: string) => {
-          updated.add(p);
-
-          const grandparents = parentMap[p] || [];
-
-          grandparents.forEach((gp: string) => {
-            updated.add(gp);
-          });
-
-          openParentsRecursively(p);
-        });
-      };
-
-      openParentsRecursively(node.id);
-
-      return updated;
-    });
-
-    return node.id;
+    prevNodeId = nodeId;
   });
-
-  return;
-}
+});
