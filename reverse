@@ -1,42 +1,71 @@
-// 🔥 cleanup shared-node descendants from other branches
-const currentNodePath =
-  nodePaths[node.id] || [];
+const [nodePaths, setNodePaths] = useState<any>({});
 
-Array.from(updated).forEach((visibleId: any) => {
-  if (visibleId === node.id) return;
 
-  // same shared node label
-  if (visibleId !== node.id) {
-    const visibleNode = nodeMap.get(visibleId);
-    const currentNode = nodeMap.get(node.id);
+const initialPaths: any = {};
 
-    if (
-      visibleNode?.label === currentNode?.label &&
-      visibleNode?.level === currentNode?.level
-    ) {
-      const visiblePath =
-        nodePaths[visibleId] || [];
-
-      // different hierarchy branch
-      const isDifferentBranch =
-        JSON.stringify(
-          visiblePath.slice(0, -1)
-        ) !==
-        JSON.stringify(
-          currentNodePath.slice(0, -1)
-        );
-
-      if (isDifferentBranch) {
-        const descendants =
-          getAllDescendants(
-            visibleId,
-            childrenMap
-          );
-
-        descendants.forEach((d: any) => {
-          updated.delete(d);
-        });
-      }
-    }
-  }
+roots.forEach((r: string) => {
+  initialPaths[r] = [r];
 });
+
+setNodePaths(initialPaths);
+
+setVisibleNodeIds(new Set(roots));
+
+
+
+
+====
+
+let currentDomain = selectedDomain;
+
+// 🔥 exact clicked hierarchy path
+const activePath =
+  nodePaths[node.id] || [node.id];
+
+// 🔥 maintain red hierarchy tracking
+setSelectedPath(activePath);
+
+if (nodeData.level === 0) {
+  currentDomain = nodeData.label;
+  setSelectedDomain(currentDomain);
+}
+
+
+====
+
+} else {
+
+  // 🔥 ONLY valid children for selected branch
+  const validChildren = edgesData
+    .filter((e: any) => {
+      if (e.source !== node.id) return false;
+
+      return (
+        JSON.stringify(e.fullPath) ===
+        JSON.stringify(activePath)
+      );
+    })
+    .map((e: any) => e.target);
+
+  validChildren.forEach((c: any) => updated.add(c));
+
+  // 🔥 preserve exact hierarchy path
+  setNodePaths((prev: any) => {
+    const updatedPaths = { ...prev };
+
+    validChildren.forEach((childId: string) => {
+      updatedPaths[childId] = [
+        ...activePath,
+        childId
+      ];
+    });
+
+    return updatedPaths;
+  });
+
+  nodesData.forEach((n: any) => {
+    if (n.level === 0) updated.add(n.id);
+  });
+
+  return updated;
+}
