@@ -1,53 +1,54 @@
-const isNodeUsedElsewhere = (
-  nodeId: string,
-  collapsingPath: string[],
-  visibleNodeIds: Set<string>,
-  nodePaths: Record<string, string[][]>
-) => {
+const [
+  activeBranchByNode,
+  setActiveBranchByNode
+] = useState<
+  Record<string, string[]>
+>({});
 
-  const paths =
-    nodePaths[nodeId] || [];
+====
 
-  return paths.some((path) => {
+const activePath =
+  activeBranchByNode[node.id] ||
+  (nodePaths[node.id]?.[0]) ||
+  [node.id];
 
-    // ignore collapsing branch
-    const sameBranch =
-      collapsingPath.every(
-        (p, idx) => path[idx] === p
-      );
 
-    if (sameBranch) {
-      return false;
-    }
+==
 
-    // node still visible via another branch
-    return path.every((p) =>
-      visibleNodeIds.has(p)
-    );
+setActiveBranchByNode((prev) => {
+
+  const updatedBranches = {
+    ...prev
+  };
+
+  children.forEach((childId: string) => {
+
+    updatedBranches[childId] = [
+      ...activePath,
+      childId
+    ];
   });
-};
 
-
-=======
-
-
-const descendants =
-  getAllDescendants(
-    node.id,
-    childrenMap
-  );
-
-descendants.forEach((d: any) => {
-
-  const shouldKeep =
-    isNodeUsedElsewhere(
-      d,
-      activePath,
-      updated,
-      nodePaths
-    );
-
-  if (!shouldKeep) {
-    updated.delete(d);
-  }
+  return updatedBranches;
 });
+
+======
+
+setActiveBranchByNode((prev) => {
+
+  const updatedBranches = {
+    ...prev
+  };
+
+  path.forEach((nodeId, idx) => {
+
+    updatedBranches[nodeId] =
+      path.slice(0, idx + 1);
+  });
+
+  return updatedBranches;
+});
+
+
+====
+
