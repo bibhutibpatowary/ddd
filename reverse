@@ -4,35 +4,18 @@ let activePath: string[] = [];
 if (nodeData.level === 0) {
   activePath = [node.id];
 } else {
-  // 🔥 find exact edge path using selectedPath hierarchy
+  // 🔥 exact parent based on hierarchy level
+  const parentNodeId =
+    selectedPath[nodeData.level - 1];
+
   const matchedEdge = edgesData.find((e: any) => {
-    if (e.target !== node.id) return false;
-
-    // 🔥 parent must be previous selected node
-    const previousNode =
-      selectedPath[selectedPath.length - 1];
-
-    return e.source === previousNode;
+    return (
+      e.source === parentNodeId &&
+      e.target === node.id
+    );
   });
 
   activePath = matchedEdge
     ? [...matchedEdge.fullPath, node.id]
     : [node.id];
 }
-
-
-===
-
-if (nodeData.level === 0) {
-  currentDomain = nodeData.label;
-  setSelectedDomain(currentDomain);
-
-  setSelectedPath([node.id]);
-} else {
-  // 🔥 always use exact reconstructed hierarchy
-  setSelectedPath(activePath);
-}
-
-===
-
-
