@@ -1,168 +1,178 @@
-const onNodeClick = useCallback(
-  (_: any, node: any) => {
-    if (isLeafNode(node.id)) {
-      setActiveReverseLeaf((prev) => {
-        const isSame = prev === node.id;
+const buildReverseEdges = (
+  startNodeId: string,
+  allowedNodes: Set<string>,
+  branchPath: string[] // ✅ Add branch context
+) => {
+  const visitedNodes = new Set<string>();
+  const visitedEdges = new Set<string>();
+  const edges: { source: string; target: string }[] = [];
 
-        if (isSame) {
-          return null;
-        }
+  // ✅ Convert branch path to Set for O(1) lookup
+  const branchNodeSet = new Set(branchPath);
 
-        const reverseEdges = buildReverseEdges(node.id, visibleNodeIds);
+  const dfs = (nodeId: string) => {
+    visitedNodes.add(nodeId);
 
-        setVisibleNodeIds((prevVisible: any) => {
-          const updated = new Set(prevVisible);
+    const parents = parentMap[nodeId] || [];
 
-          reverseEdges.forEach((e: any) => {
-            updated.add(e.source);
-            updated.add(e.target);
-          });
+    parents.forEach((parentId: string) => {
+      // ✅ Must be visible AND in the same branch path
+      if (!allowedNodes.has(parentId)) return;
+      if (!branchNodeSet.has(parentId)) return;
 
-          const visitedParents = new Set<string>();
+      const edgeKey = `${nodeId}->${parentId}`;
 
-          const openParentsRecursively = (currentId: string) => {
-            if (visitedParents.has(currentId)) return;
+      if (visitedEdges.has(edgeKey)) return;
 
-            visitedParents.add(currentId);
+      visitedEdges.add(edgeKey);
 
-            const parents = parentMap[currentId] || [];
-
-            parents.forEach((p: string) => {
-              updated.add(p);
-
-              const grandparents = parentMap[p] || [];
-
-              grandparents.forEach((gp: string) => {
-                updated.add(gp);
-              });
-
-              openParentsRecursively(p);
-            });
-          };
-
-          openParentsRecursively(node.id);
-
-          return updated;
-        });
-
-        return node.id;
+      edges.push({
+        source: nodeId,
+        target: parentId
       });
 
-      return;
-    }
-
-    setActiveReverseLeaf(null);
-
-    const nodeData = nodeMap.get(node.id);
-
-    let currentDomain = selectedDomain;
-
-    const activePath = nodePaths[node.id] || [node.id];
-
-    if (nodeData.level === 0) {
-      currentDomain = nodeData.label;
-      setSelectedDomain(currentDomain);
-      setSelectedPath([node.id]);
-    } else {
-      setSelectedPath(activePath);
-    }
-
-    // Exact branch matching for shared nodes
-    let children = edgesData
-      .filter((e: any) => {
-        if (e.source !== node.id) return false;
-
-        if (e.fullPath.length !== activePath.length) return false;
-
-        return e.fullPath.every(
-          (pathNode: string, idx: number) =>
-            activePath[idx] === pathNode
-        );
-      })
-      .map((e: any) => e.target);
-
-    // Level 1 domain filtering
-    if (nodeData.level === 1 && currentDomain) {
-      const filteredRows = rows.filter(
-        (r: any) =>
-          r.Domain === currentDomain &&
-          r.Geography === nodeData.label
-      );
-
-      const validDPs = new Set(
-        filteredRows.map((r: any) => r.DP_Disposition)
-      );
-
-      children = children.filter((childId: any) => {
-        const label = nodeMap.get(childId)?.label;
-        return validDPs.has(label);
-      });
-    }
-
-    setVisibleNodeIds((prev: any) => {
-      const updated = new Set(prev);
-
-      // ✅ Check if THIS node's children are visible (branch-aware)
-      const theseChildrenVisible = children.length > 0 && children.every((c: any) =>
-        updated.has(c)
-      );
-
-      if (theseChildrenVisible) {
-        // ✅ COLLAPSE: Only remove descendants of THIS node
-        const descendants = getAllDescendants(node.id, childrenMap);
-
-        descendants.forEach((d: any) => updated.delete(d));
-
-        setSelectedPath((prev: any) => {
-          const index = prev.indexOf(node.id);
-          if (index === -1) return prev;
-          return prev.slice(0, index + 1);
-        });
-
-        // ✅ Clean up nodePaths for collapsed descendants
-        setNodePaths((prev: any) => {
-          const updatedPaths = { ...prev };
-          descendants.forEach((d: any) => {
-            delete updatedPaths[d];
-          });
-          return updatedPaths;
-        });
-
-        return updated;
-      } else {
-        // ✅ EXPAND: Just add children, don't touch other branches
-        children.forEach((c: any) => updated.add(c));
-
-        setNodePaths((prev: any) => {
-          const updatedPaths = { ...prev };
-
-          children.forEach((childId: string) => {
-            updatedPaths[childId] = [...activePath, childId];
-          });
-
-          return updatedPaths;
-        });
-
-        // Keep root nodes visible
-        nodesData.forEach((n: any) => {
-          if (n.level === 0) updated.add(n.id);
-        });
-
-        return updated;
+      if (!visitedNodes.has(parentId)) {
+        dfs(parentId);
       }
     });
+  };
 
-    setActiveNode(node.id);
-  },
-  [
-    childrenMap,
-    nodeMap,
-    nodesData,
-    selectedDomain,
-    rows,
-    edgesData,
-    nodePaths,
-    parentMap,
-    visibleNodeIds
-  ]
-);
+  dfs(startNodeId);
+
+  return edges;
+};
+
+
+========================
+
+if (isLeafNode(node.id)) {
+  setActiveReverseLeaf((prev) => {
+    const isSame = prev === node.id;
+
+    if (isSame) {
+      return null;
+    }
+
+    // ✅ Get the branch path for this leaf
+    const leafBranchPath = nodePaths[node.id] || [node.id];
+
+    // ✅ Pass branch path to buildReverseEdges
+    const reverseEdges = buildReverseEdges(
+      node.id,
+      visibleNodeIds,
+      leafBranchPath
+    );
+
+    setVisibleNodeIds((prevVisible: any) => {
+      const updated = new Set(prevVisible);
+
+      reverseEdges.forEach((e: any) => {
+        updated.add(e.source);
+        updated.add(e.target);
+      });
+
+      const visitedParents = new Set<string>();
+
+      const openParentsRecursively = (currentId: string) => {
+        if (visitedParents.has(currentId)) return;
+
+        visitedParents.add(currentId);
+
+        const parents = parentMap[currentId] || [];
+
+        parents.forEach((p: string) => {
+          // ✅ Only open parents in the same branch
+          if (!leafBranchPath.includes(p)) return;
+
+          updated.add(p);
+
+          const grandparents = parentMap[p] || [];
+
+          grandparents.forEach((gp: string) => {
+            if (leafBranchPath.includes(gp)) {
+              updated.add(gp);
+            }
+          });
+
+          openParentsRecursively(p);
+        });
+      };
+
+      openParentsRecursively(node.id);
+
+      return updated;
+    });
+
+    return node.id;
+  });
+
+  return;
+}
+
+
+
+============
+
+
+const edges = useMemo(() => {
+  let finalEdges: any[] = [...edgesData];
+
+  // Add reverse edges if leaf selected
+  if (activeReverseLeaf) {
+    // ✅ Get branch path for the active reverse leaf
+    const leafBranchPath = nodePaths[activeReverseLeaf] || [activeReverseLeaf];
+
+    const reverseEdges = buildReverseEdges(
+      activeReverseLeaf,
+      visibleNodeIds,
+      leafBranchPath
+    ).map((e, i) => ({
+      id: `rev-${activeReverseLeaf}-${i}`,
+      source: e.target,
+      target: e.source,
+      isReverse: true
+    }));
+
+    finalEdges = [...finalEdges, ...reverseEdges];
+  }
+
+  return finalEdges
+    .filter(
+      (e: any) =>
+        visibleNodeIds.has(e.source) &&
+        visibleNodeIds.has(e.target)
+    )
+    .map((e: any) => {
+      const isPathEdge = selectedPath.some(
+        (nodeId: any, index: number) =>
+          selectedPath[index + 1] === e.target &&
+          nodeId === e.source
+      );
+
+      return {
+        ...e,
+        type: "smoothstep",
+        animated: isPathEdge || e.isReverse,
+
+        ...(e.isReverse && {
+          markerStart: {
+            type: MarkerType.ArrowClosed,
+            color: "#007bff",
+            width: 20,
+            height: 20
+          }
+        }),
+
+        style: {
+          stroke: e.isReverse
+            ? "#007bff"
+            : isPathEdge
+              ? "red"
+              : "#bbb",
+
+          strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
+          strokeDasharray: e.isReverse ? "5 5" : "0"
+        }
+      };
+    });
+}, [edgesData, visibleNodeIds, selectedPath, activeReverseLeaf, nodePaths]);
