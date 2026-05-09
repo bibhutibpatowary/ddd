@@ -1,54 +1,35 @@
-const addEdge = (
-  source: string,
-  target: string,
-  rootDomain: string
-) => {
-  edgesSet.add(
-    JSON.stringify({
-      source,
-      target,
-      rootDomain
-    })
-  );
-};
+const buildReverseEdges = (startNodeId: string) => {
+  const visitedNodes = new Set<string>();
+  const visitedEdges = new Set<string>();
 
+  const edges: { source: string; target: string }[] = [];
 
-====
+  const dfs = (nodeId: string) => {
+    visitedNodes.add(nodeId);
 
+    const parents = parentMap[nodeId] || [];
 
-const rootDomain = row[columns[0]];
+    parents.forEach((parentId: string) => {
+      const edgeKey = `${nodeId}->${parentId}`;
 
+      // 🔥 prevent duplicate edge traversal
+      if (visitedEdges.has(edgeKey)) return;
 
-addEdge(prevNodeId, nodeId, rootDomain);
+      visitedEdges.add(edgeKey);
 
+      edges.push({
+        source: nodeId,
+        target: parentId
+      });
 
-
-
-const edgesArr: any = Array.from(edgesSet).map((e: any, i) => {
-  const parsed = JSON.parse(e);
-
-  return {
-    id: `e-${i}`,
-    source: parsed.source,
-    target: parsed.target,
-    rootDomain: parsed.rootDomain
-  };
-});
-
-
-
-
-let children =
-  edgesData
-    .filter((e: any) => {
-      // 🔥 forward filtering
-      if (selectedDomain) {
-        return (
-          e.source === node.id &&
-          e.rootDomain === selectedDomain
-        );
+      // 🔥 prevent cyclic recursion
+      if (!visitedNodes.has(parentId)) {
+        dfs(parentId);
       }
+    });
+  };
 
-      return e.source === node.id;
-    })
-    .map((e: any) => e.target);
+  dfs(startNodeId);
+
+  return edges;
+};
