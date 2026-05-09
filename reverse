@@ -1,18 +1,15 @@
-const currentNodeLevel = nodeData.level;
+let children =
+  edgesData
+    .filter((e: any) => {
+      if (e.source !== node.id) return false;
 
-let children = edgesData
-  .filter((e: any) => {
-    if (e.source !== node.id) return false;
+      // 🔥 compare ONLY till current node level
+      const edgePathTillCurrentNode =
+        e.fullPath.slice(0, activePath.length);
 
-    // 🔥 path length must match exactly
-    if (e.fullPath.length !== activePath.length) {
-      return false;
-    }
-
-    // 🔥 exact hierarchy match
-    return e.fullPath.every(
-      (pathNode: string, idx: number) =>
-        activePath[idx] === pathNode
-    );
-  })
-  .map((e: any) => e.target);
+      return edgePathTillCurrentNode.every(
+        (pathNode: string, idx: number) =>
+          activePath[idx] === pathNode
+      );
+    })
+    .map((e: any) => e.target);
