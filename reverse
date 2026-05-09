@@ -1,42 +1,18 @@
-const COLORS = [
-  "#4A90E2",
-  "#9B59B6",
-  "#F39C12",
-  "#1ABC9C",
-  "#2ECC71",
-  "#E67E22",
-  "#F1C40F",
-  "#95A5A6",
-  "#E84393",
-  "#00CEC9"
-];
+const systemParentMap: any = {};
 
-const baseColor = COLORS[level % COLORS.length];
+cleanData.forEach((row: any) => {
+  const firstParent = Object.values(row)[0]; // first column
+  const systemName = row.System_Name;
 
-======
+  if (!systemParentMap[systemName]) {
+    systemParentMap[systemName] = new Set();
+  }
 
-const columns: string[] = Object.keys(cleanData[0] || {});
+  systemParentMap[systemName].add(firstParent);
+});
 
-cleanData.forEach((raw: any) => {
-  const row = normalizeRow(raw);
-
-  let prevNodeId: string | null = null;
-
-  columns.forEach((col: string, level: number) => {
-    const value = row[col];
-
-    if (!value) return;
-
-    const nodeId = prevNodeId
-      ? `${prevNodeId}|${value}`
-      : value;
-
-    addNode(nodeId, level, value);
-
-    if (prevNodeId) {
-      addEdge(prevNodeId, nodeId);
-    }
-
-    prevNodeId = nodeId;
-  });
+Object.entries(systemParentMap).forEach(([system, parents]: any) => {
+  if (parents.size > 1) {
+    console.log(system, [...parents]);
+  }
 });
