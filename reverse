@@ -1,21 +1,53 @@
-const existingPaths =
-  allNodePaths[nodeId] || [];
+const isNodeUsedElsewhere = (
+  nodeId: string,
+  collapsingPath: string[],
+  visibleNodeIds: Set<string>,
+  nodePaths: Record<string, string[][]>
+) => {
 
-const newPath = [...currentPath];
+  const paths =
+    nodePaths[nodeId] || [];
 
-const alreadyExists =
-  existingPaths.some(
-    (p) =>
-      JSON.stringify(p) ===
-      JSON.stringify(newPath)
+  return paths.some((path) => {
+
+    // ignore collapsing branch
+    const sameBranch =
+      collapsingPath.every(
+        (p, idx) => path[idx] === p
+      );
+
+    if (sameBranch) {
+      return false;
+    }
+
+    // node still visible via another branch
+    return path.every((p) =>
+      visibleNodeIds.has(p)
+    );
+  });
+};
+
+
+=======
+
+
+const descendants =
+  getAllDescendants(
+    node.id,
+    childrenMap
   );
 
-if (!alreadyExists) {
-  allNodePaths[nodeId] = [
-    ...existingPaths,
-    newPath
-  ];
-}
+descendants.forEach((d: any) => {
 
-===
+  const shouldKeep =
+    isNodeUsedElsewhere(
+      d,
+      activePath,
+      updated,
+      nodePaths
+    );
 
+  if (!shouldKeep) {
+    updated.delete(d);
+  }
+});
