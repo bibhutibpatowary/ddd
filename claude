@@ -1,59 +1,47 @@
-let children = edgesData
-  .filter((e: any) => {
-    if (e.source !== node.id) return false;
-
-    // activePath includes the clicked node
-    // e.fullPath stores path UP TO (excluding) target
-    // So for this edge, e.fullPath should exactly equal activePath
-
-    if (e.fullPath.length !== activePath.length) return false;
-
-    return e.fullPath.every(
-      (pathNode: string, idx: number) =>
-        activePath[idx] === pathNode
-    );
-  })
-  .map((e: any) => e.target);
-
-
-=======
-
-
-
 const onNodeClick = useCallback(
   (_: any, node: any) => {
     if (isLeafNode(node.id)) {
-      // ... existing reverse traversal logic unchanged ...
       setActiveReverseLeaf((prev) => {
         const isSame = prev === node.id;
-        if (isSame) return null;
+
+        if (isSame) {
+          return null;
+        }
 
         const reverseEdges = buildReverseEdges(node.id, visibleNodeIds);
 
         setVisibleNodeIds((prevVisible: any) => {
           const updated = new Set(prevVisible);
+
           reverseEdges.forEach((e: any) => {
             updated.add(e.source);
             updated.add(e.target);
           });
 
           const visitedParents = new Set<string>();
+
           const openParentsRecursively = (currentId: string) => {
             if (visitedParents.has(currentId)) return;
+
             visitedParents.add(currentId);
 
             const parents = parentMap[currentId] || [];
+
             parents.forEach((p: string) => {
               updated.add(p);
+
               const grandparents = parentMap[p] || [];
+
               grandparents.forEach((gp: string) => {
                 updated.add(gp);
               });
+
               openParentsRecursively(p);
             });
           };
 
           openParentsRecursively(node.id);
+
           return updated;
         });
 
@@ -66,6 +54,7 @@ const onNodeClick = useCallback(
     setActiveReverseLeaf(null);
 
     const nodeData = nodeMap.get(node.id);
+
     let currentDomain = selectedDomain;
 
     const activePath = nodePaths[node.id] || [node.id];
@@ -84,6 +73,9 @@ const onNodeClick = useCallback(
         if (e.source !== node.id) return false;
 
         // Exact length + content match
+        // activePath includes the clicked node
+        // e.fullPath stores path UP TO (excluding) target
+        // So for this edge, e.fullPath should exactly equal activePath
         if (e.fullPath.length !== activePath.length) return false;
 
         return e.fullPath.every(
@@ -93,7 +85,7 @@ const onNodeClick = useCallback(
       })
       .map((e: any) => e.target);
 
-    // Level 1 domain filtering (unchanged)
+    // Level 1 domain filtering
     if (nodeData.level === 1 && currentDomain) {
       const filteredRows = rows.filter(
         (r: any) =>
@@ -111,23 +103,113 @@ const onNodeClick = useCallback(
       });
     }
 
-    // ... rest of setVisibleNodeIds logic remains exactly the same ...
     setVisibleNodeIds((prev: any) => {
-      // ... unchanged ...
+      const updated = new Set(prev);
+
+      const areChildrenVisible = children.every((c: any) =>
+        updated.has(c)
+      );
+
+      if (areChildrenVisible) {
+        const descendants = getAllDescendants(node.id, childrenMap);
+
+        descendants.forEach((d: any) => updated.delete(d));
+
+        setSelectedPath((prev: any) => {
+          const index = prev.indexOf(node.id);
+          if (index === -1) return prev;
+          return prev.slice(0, index + 1);
+        });
+
+        descendants.forEach((d: any) => {
+          if (updated.has(d)) {
+            updated.delete(d);
+          }
+        });
+
+        return updated;
+      } else {
+        // Remove descendants of sibling branches first
+        const parentPath = activePath.slice(0, -1);
+
+        const siblingNodes = Array.from(updated).filter((visibleId: any) => {
+          const visiblePath = nodePaths[visibleId];
+
+          if (!visiblePath) return false;
+
+          const sameParent = parentPath.every(
+            (p: string, idx: number) => visiblePath[idx] === p
+          );
+
+          const sameLevel =
+            nodeMap.get(visibleId)?.level === nodeMap.get(node.id)?.level;
+
+          const notCurrent = visibleId !== node.id;
+
+          return sameParent && sameLevel && notCurrent;
+        });
+
+        // Remove sibling descendants
+        siblingNodes.forEach((siblingId: any) => {
+          const descendants = getAllDescendants(siblingId, childrenMap);
+
+          descendants.forEach((d: any) => {
+            updated.delete(d);
+          });
+        });
+
+        // Cleanup shared-node descendants from other branches
+        const currentNodePath = nodePaths[node.id] || [];
+
+        Array.from(updated).forEach((visibleId: any) => {
+          if (visibleId === node.id) return;
+
+          const visibleNode = nodeMap.get(visibleId);
+          const currentNode = nodeMap.get(node.id);
+
+          if (
+            visibleNode?.label === currentNode?.label &&
+            visibleNode?.level === currentNode?.level
+          ) {
+            const visiblePath = nodePaths[visibleId] || [];
+
+            const isDifferentBranch =
+              JSON.stringify(visiblePath.slice(0, -1)) !==
+              JSON.stringify(currentNodePath.slice(0, -1));
+
+            if (isDifferentBranch) {
+              const descendants = getAllDescendants(visibleId, childrenMap);
+
+              descendants.forEach((d: any) => {
+                updated.delete(d);
+              });
+            }
+          }
+        });
+
+        // Add current children
+        children.forEach((c: any) => updated.add(c));
+
+        setNodePaths((prev: any) => {
+          const updatedPaths = { ...prev };
+
+          children.forEach((childId: string) => {
+            updatedPaths[childId] = [...activePath, childId];
+          });
+
+          return updatedPaths;
+        });
+
+        // Keep root nodes visible
+        nodesData.forEach((n: any) => {
+          if (n.level === 0) updated.add(n.id);
+        });
+
+        return updated;
+      }
     });
 
     setActiveNode(node.id);
-  },
-  [childrenMap, nodeMap, nodesData, selectedDomain, rows, edgesData, nodePaths, parentMap, visibleNodeIds]
-);
-
-
-====
-
-
-const onNodeClick = useCallback(
-  (_: any, node: any) => {
-    // ...
   },
   [
     childrenMap,
@@ -135,9 +217,9 @@ const onNodeClick = useCallback(
     nodesData,
     selectedDomain,
     rows,
-    edgesData,      // ✅ add
-    nodePaths,      // ✅ add
-    parentMap,      // ✅ add
-    visibleNodeIds  // ✅ add
+    edgesData,
+    nodePaths,
+    parentMap,
+    visibleNodeIds
   ]
 );
