@@ -1,23 +1,46 @@
-const incomingEdge = edgesData.find(
-  (e: any) =>
-    e.target === node.id &&
-    visibleNodeIds.has(e.source)
-);
+const [nodeActivePaths, setNodeActivePaths] = useState<any>({});
 
-// 🔥 reconstruct REAL active hierarchy
-const activePath = incomingEdge
-  ? [...incomingEdge.fullPath, node.id]
-  : [node.id];
+===
 
-let children =
-  edgesData
-    .filter((e: any) => {
-      if (e.source !== node.id) return false;
 
-      // 🔥 exact branch matching
-      return activePath.every(
-        (pathNode, idx) =>
-          e.fullPath[idx] === pathNode
-      );
-    })
-    .map((e: any) => e.target);
+const initialPaths: any = {};
+
+roots.forEach((r: string) => {
+  initialPaths[r] = [r];
+});
+
+setNodeActivePaths(initialPaths);
+
+
+===
+
+
+const activePath =
+  nodeActivePaths[node.id] || [node.id];
+
+====
+
+setNodeActivePaths((prev: any) => {
+  const updatedPaths = { ...prev };
+
+  children.forEach((childId: string) => {
+    updatedPaths[childId] = [
+      ...activePath,
+      childId
+    ];
+  });
+
+  return updatedPaths;
+});
+
+=====
+
+
+const initialPaths: any = {};
+
+roots.forEach((r: string) => {
+  initialPaths[r] = [r];
+});
+
+setNodeActivePaths(initialPaths);
+
