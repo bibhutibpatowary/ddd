@@ -1,47 +1,41 @@
-setNodePaths((prev: any) => {
-  const updatedPaths = { ...prev };
+// 🔥 remove descendants of sibling branches first
+const parentPath = activePath.slice(0, -1);
 
-  children.forEach((childId: string) => {
-    const newPath = [
-      ...activePath,
-      childId
-    ];
+const siblingNodes = Array.from(updated).filter((visibleId: any) => {
+  const visiblePath = nodePaths[visibleId];
 
-    if (!updatedPaths[childId]) {
-      updatedPaths[childId] = [];
-    }
+  if (!visiblePath) return false;
 
-    // 🔥 avoid duplicate path insertions
-    const alreadyExists =
-      updatedPaths[childId].some(
-        (p: string[]) =>
-          JSON.stringify(p) === JSON.stringify(newPath)
-      );
+  // same parent hierarchy
+  const sameParent =
+    parentPath.every(
+      (p: string, idx: number) =>
+        visiblePath[idx] === p
+    );
 
-    if (!alreadyExists) {
-      updatedPaths[childId].push(newPath);
-    }
-  });
+  // sibling node at same depth
+  const sameLevel =
+    visiblePath.length === activePath.length;
 
-  return updatedPaths;
+  // not current node
+  const notCurrent =
+    visibleId !== node.id;
+
+  return sameParent && sameLevel && notCurrent;
 });
 
-
-
-=======
-const availablePaths =
-  nodePaths[node.id] || [];
-
-const activePath =
-  availablePaths.find((p: string[]) => {
-    return selectedPath.every(
-      (nodeId: string, idx: number) =>
-        p[idx] === nodeId
+// 🔥 remove sibling descendants
+siblingNodes.forEach((siblingId: any) => {
+  const descendants =
+    getAllDescendants(
+      siblingId,
+      childrenMap
     );
-  }) || availablePaths[0] || [node.id];
 
+  descendants.forEach((d: any) => {
+    updated.delete(d);
+  });
+});
 
-====
-
-
-
+// 🔥 now add current children
+children.forEach((c: any) => updated.add(c));
