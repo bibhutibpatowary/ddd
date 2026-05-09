@@ -1,23 +1,39 @@
-const visitedParents = new Set<string>();
+const buildReverseEdges = (
+  startNodeId: string,
+  allowedNodes: Set<string>
+) => {
+  const visitedNodes = new Set<string>();
+  const visitedEdges = new Set<string>();
 
-const openParentsRecursively = (currentId: string) => {
-  // 🔥 stop cyclic recursion
-  if (visitedParents.has(currentId)) return;
+  const edges: { source: string; target: string }[] = [];
 
-  visitedParents.add(currentId);
+  const dfs = (nodeId: string) => {
+    visitedNodes.add(nodeId);
 
-  const parents = parentMap[currentId] || [];
+    const parents = parentMap[nodeId] || [];
 
-  parents.forEach((p: string) => {
-    updated.add(p);
+    parents.forEach((parentId: string) => {
+      // 🔥 ONLY traverse active branch nodes
+      if (!allowedNodes.has(parentId)) return;
 
-    const grandparents = parentMap[p] || [];
+      const edgeKey = `${nodeId}->${parentId}`;
 
-    grandparents.forEach((gp: string) => {
-      updated.add(gp);
+      if (visitedEdges.has(edgeKey)) return;
+
+      visitedEdges.add(edgeKey);
+
+      edges.push({
+        source: nodeId,
+        target: parentId
+      });
+
+      if (!visitedNodes.has(parentId)) {
+        dfs(parentId);
+      }
     });
+  };
 
-    // 🔥 recurse safely
-    openParentsRecursively(p);
-  });
+  dfs(startNodeId);
+
+  return edges;
 };
