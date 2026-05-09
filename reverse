@@ -1,18 +1,49 @@
-const systemParentMap: any = {};
+if (isLeafNode(node.id)) {
 
-cleanData.forEach((row: any) => {
-  const firstParent = Object.values(row)[0]; // first column
-  const systemName = row.System_Name;
+  setActiveReverseLeaf((prev) => {
+    const isSame = prev === node.id;
 
-  if (!systemParentMap[systemName]) {
-    systemParentMap[systemName] = new Set();
-  }
+    // remove reverse selection only
+    if (isSame) {
+      return null;
+    }
 
-  systemParentMap[systemName].add(firstParent);
-});
+    // 🔥 build full reverse hierarchy
+    const reverseEdges = buildReverseEdges(node.id);
 
-Object.entries(systemParentMap).forEach(([system, parents]: any) => {
-  if (parents.size > 1) {
-    console.log(system, [...parents]);
-  }
-});
+    // 🔥 auto-open ALL reverse parent nodes
+    setVisibleNodeIds((prevVisible: any) => {
+      const updated = new Set(prevVisible);
+
+      reverseEdges.forEach((e: any) => {
+        updated.add(e.source);
+        updated.add(e.target);
+      });
+
+      // 🔥 recursively ensure all ancestors visible
+      const openParentsRecursively = (currentId: string) => {
+        const parents = parentMap[currentId] || [];
+
+        parents.forEach((p: string) => {
+          updated.add(p);
+
+          const grandparents = parentMap[p] || [];
+
+          grandparents.forEach((gp: string) => {
+            updated.add(gp);
+          });
+
+          openParentsRecursively(p);
+        });
+      };
+
+      openParentsRecursively(node.id);
+
+      return updated;
+    });
+
+    return node.id;
+  });
+
+  return;
+}
