@@ -1,12 +1,104 @@
-let children =
-  edgesData
-    .filter((e: any) => {
-      if (e.source !== node.id) return false;
+const [nodePaths, setNodePaths] = useState<
+  Record<string, string[][]>
+>({});
 
-      // 🔥 STRICT EXACT hierarchy match
-      return (
-        JSON.stringify(e.fullPath) ===
-        JSON.stringify(activePath)
+
+
+===
+
+
+initialPaths[r] = [[r]];
+
+
+
+===
+
+const getActivePathForNode = (
+  nodeId: string,
+  selectedPath: string[],
+  nodePaths: Record<string, string[][]>
+) => {
+  const paths = nodePaths[nodeId] || [];
+
+  // exact selected branch match
+  const matched = paths.find((p) =>
+    selectedPath.every(
+      (node, idx) => p[idx] === node
+    )
+  );
+
+  // fallback
+  return matched || paths[0] || [nodeId];
+};
+
+=====
+
+
+const activePath =
+  getActivePathForNode(
+    node.id,
+    selectedPath,
+    nodePaths
+  );
+
+===
+
+setNodePaths((prev: any) => {
+  const updatedPaths = { ...prev };
+
+  children.forEach((childId: string) => {
+    const newPath = [
+      ...activePath,
+      childId
+    ];
+
+    const existing =
+      updatedPaths[childId] || [];
+
+    // avoid duplicate path insertion
+    const alreadyExists =
+      existing.some(
+        (p: string[]) =>
+          JSON.stringify(p) ===
+          JSON.stringify(newPath)
       );
-    })
-    .map((e: any) => e.target);
+
+    if (!alreadyExists) {
+      updatedPaths[childId] = [
+        ...existing,
+        newPath
+      ];
+    }
+  });
+
+  return updatedPaths;
+});
+
+===
+
+const leafPaths =
+  nodePaths[node.id] || [];
+
+const leafBranchPath =
+  leafPaths[0] || [node.id];
+
+==
+
+let children = edgesData
+  .filter((e: any) => {
+    if (e.source !== node.id) return false;
+
+    // exact branch match
+    if (
+      e.fullPath.length !==
+      activePath.length
+    ) {
+      return false;
+    }
+
+    return e.fullPath.every(
+      (pathNode: string, idx: number) =>
+        activePath[idx] === pathNode
+    );
+  })
+  .map((e: any) => e.target);
