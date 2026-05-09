@@ -1,94 +1,21 @@
-const buildReverseEdges = (
-  startNodeId: string,
-  allowedNodes: Set<string>,
-  allBranchPaths: string[][]
-) => {
-  const visitedEdges = new Set<string>();
+const existingPaths =
+  allNodePaths[nodeId] || [];
 
-  const edges: {
-    source: string;
-    target: string;
-  }[] = [];
+const newPath = [...currentPath];
 
-  allBranchPaths.forEach((branchPath) => {
-    // reverse traverse path
-    for (
-      let i = branchPath.length - 1;
-      i > 0;
-      i--
-    ) {
-      const child = branchPath[i];
-      const parent = branchPath[i - 1];
+const alreadyExists =
+  existingPaths.some(
+    (p) =>
+      JSON.stringify(p) ===
+      JSON.stringify(newPath)
+  );
 
-      const edgeKey =
-        `${parent}->${child}`;
-
-      if (visitedEdges.has(edgeKey)) {
-        continue;
-      }
-
-      visitedEdges.add(edgeKey);
-
-      edges.push({
-        source: parent,
-        target: child
-      });
-    }
-  });
-
-  return edges;
-};
-
-
-===
-
-if (isLeafNode(node.id)) {
-
-  setActiveReverseLeaf((prev) => {
-
-    const isSame =
-      prev === node.id;
-
-    if (isSame) {
-      return null;
-    }
-
-    // ALL possible ancestry paths
-    const leafPaths =
-      nodePaths[node.id] || [];
-
-    setVisibleNodeIds((prevVisible: any) => {
-
-      const updated =
-        new Set(prevVisible);
-
-      // auto-open ALL ancestry nodes
-      leafPaths.forEach((path) => {
-        path.forEach((nodeId) => {
-          updated.add(nodeId);
-        });
-      });
-
-      return updated;
-    });
-
-    return node.id;
-  });
-
-  return;
+if (!alreadyExists) {
+  allNodePaths[nodeId] = [
+    ...existingPaths,
+    newPath
+  ];
 }
 
-=======
-
-const leafPaths =
-  nodePaths[activeReverseLeaf] || [];
-
-const reverseEdges =
-  buildReverseEdges(
-    activeReverseLeaf,
-    visibleNodeIds,
-    leafPaths
-  )
-
-=====
+===
 
