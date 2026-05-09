@@ -1,46 +1,15 @@
-const [nodeActivePaths, setNodeActivePaths] = useState<any>({});
+const visibleParents = parentMap[node.id] || [];
 
-===
-
-
-const initialPaths: any = {};
-
-roots.forEach((r: string) => {
-  initialPaths[r] = [r];
+// 🔥 find the ACTUAL visible parent path
+const matchedParentEdge = edgesData.find((e: any) => {
+  return (
+    e.target === node.id &&
+    visibleParents.includes(e.source) &&
+    visibleNodeIds.has(e.source)
+  );
 });
 
-setNodeActivePaths(initialPaths);
-
-
-===
-
-
-const activePath =
-  nodeActivePaths[node.id] || [node.id];
-
-====
-
-setNodeActivePaths((prev: any) => {
-  const updatedPaths = { ...prev };
-
-  children.forEach((childId: string) => {
-    updatedPaths[childId] = [
-      ...activePath,
-      childId
-    ];
-  });
-
-  return updatedPaths;
-});
-
-=====
-
-
-const initialPaths: any = {};
-
-roots.forEach((r: string) => {
-  initialPaths[r] = [r];
-});
-
-setNodeActivePaths(initialPaths);
-
+// 🔥 reconstruct correct hierarchy
+const activePath = matchedParentEdge
+  ? [...matchedParentEdge.fullPath, node.id]
+  : [node.id];
