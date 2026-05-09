@@ -1,104 +1,94 @@
-const [nodePaths, setNodePaths] = useState<
-  Record<string, string[][]>
->({});
-
-
-
-===
-
-
-initialPaths[r] = [[r]];
-
-
-
-===
-
-const getActivePathForNode = (
-  nodeId: string,
-  selectedPath: string[],
-  nodePaths: Record<string, string[][]>
+const buildReverseEdges = (
+  startNodeId: string,
+  allowedNodes: Set<string>,
+  allBranchPaths: string[][]
 ) => {
-  const paths = nodePaths[nodeId] || [];
+  const visitedEdges = new Set<string>();
 
-  // exact selected branch match
-  const matched = paths.find((p) =>
-    selectedPath.every(
-      (node, idx) => p[idx] === node
-    )
-  );
+  const edges: {
+    source: string;
+    target: string;
+  }[] = [];
 
-  // fallback
-  return matched || paths[0] || [nodeId];
-};
+  allBranchPaths.forEach((branchPath) => {
+    // reverse traverse path
+    for (
+      let i = branchPath.length - 1;
+      i > 0;
+      i--
+    ) {
+      const child = branchPath[i];
+      const parent = branchPath[i - 1];
 
-=====
+      const edgeKey =
+        `${parent}->${child}`;
 
+      if (visitedEdges.has(edgeKey)) {
+        continue;
+      }
 
-const activePath =
-  getActivePathForNode(
-    node.id,
-    selectedPath,
-    nodePaths
-  );
+      visitedEdges.add(edgeKey);
 
-===
-
-setNodePaths((prev: any) => {
-  const updatedPaths = { ...prev };
-
-  children.forEach((childId: string) => {
-    const newPath = [
-      ...activePath,
-      childId
-    ];
-
-    const existing =
-      updatedPaths[childId] || [];
-
-    // avoid duplicate path insertion
-    const alreadyExists =
-      existing.some(
-        (p: string[]) =>
-          JSON.stringify(p) ===
-          JSON.stringify(newPath)
-      );
-
-    if (!alreadyExists) {
-      updatedPaths[childId] = [
-        ...existing,
-        newPath
-      ];
+      edges.push({
+        source: parent,
+        target: child
+      });
     }
   });
 
-  return updatedPaths;
-});
+  return edges;
+};
+
 
 ===
 
-const leafPaths =
-  nodePaths[node.id] || [];
+if (isLeafNode(node.id)) {
 
-const leafBranchPath =
-  leafPaths[0] || [node.id];
+  setActiveReverseLeaf((prev) => {
 
-==
+    const isSame =
+      prev === node.id;
 
-let children = edgesData
-  .filter((e: any) => {
-    if (e.source !== node.id) return false;
-
-    // exact branch match
-    if (
-      e.fullPath.length !==
-      activePath.length
-    ) {
-      return false;
+    if (isSame) {
+      return null;
     }
 
-    return e.fullPath.every(
-      (pathNode: string, idx: number) =>
-        activePath[idx] === pathNode
-    );
-  })
-  .map((e: any) => e.target);
+    // ALL possible ancestry paths
+    const leafPaths =
+      nodePaths[node.id] || [];
+
+    setVisibleNodeIds((prevVisible: any) => {
+
+      const updated =
+        new Set(prevVisible);
+
+      // auto-open ALL ancestry nodes
+      leafPaths.forEach((path) => {
+        path.forEach((nodeId) => {
+          updated.add(nodeId);
+        });
+      });
+
+      return updated;
+    });
+
+    return node.id;
+  });
+
+  return;
+}
+
+=======
+
+const leafPaths =
+  nodePaths[activeReverseLeaf] || [];
+
+const reverseEdges =
+  buildReverseEdges(
+    activeReverseLeaf,
+    visibleNodeIds,
+    leafPaths
+  )
+
+=====
+
