@@ -1,6 +1,18 @@
-const sourcePath = activePath.slice(0, -1);
+const currentNodeLevel = nodeData.level;
 
-return sourcePath.every(
-  (pathNode: string, idx: number) =>
-    e.fullPath[idx] === pathNode
-);
+let children = edgesData
+  .filter((e: any) => {
+    if (e.source !== node.id) return false;
+
+    // 🔥 path length must match exactly
+    if (e.fullPath.length !== activePath.length) {
+      return false;
+    }
+
+    // 🔥 exact hierarchy match
+    return e.fullPath.every(
+      (pathNode: string, idx: number) =>
+        activePath[idx] === pathNode
+    );
+  })
+  .map((e: any) => e.target);
