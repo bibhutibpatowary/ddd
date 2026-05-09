@@ -1,41 +1,42 @@
-// 🔥 remove descendants of sibling branches first
-const parentPath = activePath.slice(0, -1);
+// 🔥 cleanup shared-node descendants from other branches
+const currentNodePath =
+  nodePaths[node.id] || [];
 
-const siblingNodes = Array.from(updated).filter((visibleId: any) => {
-  const visiblePath = nodePaths[visibleId];
+Array.from(updated).forEach((visibleId: any) => {
+  if (visibleId === node.id) return;
 
-  if (!visiblePath) return false;
+  // same shared node label
+  if (visibleId !== node.id) {
+    const visibleNode = nodeMap.get(visibleId);
+    const currentNode = nodeMap.get(node.id);
 
-  // same parent hierarchy
-  const sameParent =
-    parentPath.every(
-      (p: string, idx: number) =>
-        visiblePath[idx] === p
-    );
+    if (
+      visibleNode?.label === currentNode?.label &&
+      visibleNode?.level === currentNode?.level
+    ) {
+      const visiblePath =
+        nodePaths[visibleId] || [];
 
-  // sibling node at same depth
-  const sameLevel =
-    visiblePath.length === activePath.length;
+      // different hierarchy branch
+      const isDifferentBranch =
+        JSON.stringify(
+          visiblePath.slice(0, -1)
+        ) !==
+        JSON.stringify(
+          currentNodePath.slice(0, -1)
+        );
 
-  // not current node
-  const notCurrent =
-    visibleId !== node.id;
+      if (isDifferentBranch) {
+        const descendants =
+          getAllDescendants(
+            visibleId,
+            childrenMap
+          );
 
-  return sameParent && sameLevel && notCurrent;
+        descendants.forEach((d: any) => {
+          updated.delete(d);
+        });
+      }
+    }
+  }
 });
-
-// 🔥 remove sibling descendants
-siblingNodes.forEach((siblingId: any) => {
-  const descendants =
-    getAllDescendants(
-      siblingId,
-      childrenMap
-    );
-
-  descendants.forEach((d: any) => {
-    updated.delete(d);
-  });
-});
-
-// 🔥 now add current children
-children.forEach((c: any) => updated.add(c));
