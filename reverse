@@ -1,46 +1,54 @@
-const nodeId = value.trim();
-
-
-
-
-const nodesMap = new Map();
-const edgesSet = new Set();
-
-const columns: string[] = Object.keys(cleanData[0] || {});
-
-const addNode = (id: string, level: number) => {
-  if (!nodesMap.has(id)) {
-    nodesMap.set(id, {
-      id,
-      label: id,
-      level
-    });
-  }
+const addEdge = (
+  source: string,
+  target: string,
+  rootDomain: string
+) => {
+  edgesSet.add(
+    JSON.stringify({
+      source,
+      target,
+      rootDomain
+    })
+  );
 };
 
-const addEdge = (source: string, target: string) => {
-  edgesSet.add(`${source}->${target}`);
-};
 
-cleanData.forEach((raw: any) => {
-  const row = normalizeRow(raw);
+====
 
-  let prevNodeId: string | null = null;
 
-  columns.forEach((col: string, level: number) => {
-    const value = String(row[col] || "").trim();
+const rootDomain = row[columns[0]];
 
-    if (!value) return;
 
-    // 🔥 SAME NODE SHARED GLOBALLY
-    const nodeId = value;
+addEdge(prevNodeId, nodeId, rootDomain);
 
-    addNode(nodeId, level);
 
-    if (prevNodeId) {
-      addEdge(prevNodeId, nodeId);
-    }
 
-    prevNodeId = nodeId;
-  });
+
+const edgesArr: any = Array.from(edgesSet).map((e: any, i) => {
+  const parsed = JSON.parse(e);
+
+  return {
+    id: `e-${i}`,
+    source: parsed.source,
+    target: parsed.target,
+    rootDomain: parsed.rootDomain
+  };
 });
+
+
+
+
+let children =
+  edgesData
+    .filter((e: any) => {
+      // 🔥 forward filtering
+      if (selectedDomain) {
+        return (
+          e.source === node.id &&
+          e.rootDomain === selectedDomain
+        );
+      }
+
+      return e.source === node.id;
+    })
+    .map((e: any) => e.target);
