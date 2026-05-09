@@ -1,35 +1,23 @@
-cleanData.forEach((raw: any) => {
-  let prevNodeId: string | null = null;
+const matchingEdge = edgesData.find(
+  (e: any) =>
+    e.target === node.id &&
+    visibleNodeIds.has(e.source)
+);
 
-  // 🔥 current hierarchy tracker
-  const currentPath: string[] = [];
+// 🔥 actual hierarchy path till clicked node
+const activePath = matchingEdge
+  ? [...matchingEdge.fullPath, node.id]
+  : [node.id];
 
-  columns.forEach((col: string, level: number) => {
-    const value = String(raw[col] || "").trim();
+children =
+  edgesData
+    .filter((e: any) => {
+      if (e.source !== node.id) return false;
 
-    if (!value) return;
-
-    // 🔥 globally shared node
-    const nodeId = `${level}::${value}`;
-
-    addNode(nodeId, level);
-
-    const rootDomain = raw[columns[0]];
-
-    // 🔥 add node into active hierarchy
-    currentPath.push(nodeId);
-
-    if (prevNodeId) {
-      addEdge(
-        prevNodeId,
-        nodeId,
-        rootDomain,
-
-        // 🔥 store path only till source node
-        [...currentPath.slice(0, -1)]
+      // 🔥 strict hierarchy match
+      return activePath.every(
+        (pathNode, idx) =>
+          e.fullPath[idx] === pathNode
       );
-    }
-
-    prevNodeId = nodeId;
-  });
-});
+    })
+    .map((e: any) => e.target);
