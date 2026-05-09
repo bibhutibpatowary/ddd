@@ -1,0 +1,143 @@
+let children = edgesData
+  .filter((e: any) => {
+    if (e.source !== node.id) return false;
+
+    // activePath includes the clicked node
+    // e.fullPath stores path UP TO (excluding) target
+    // So for this edge, e.fullPath should exactly equal activePath
+
+    if (e.fullPath.length !== activePath.length) return false;
+
+    return e.fullPath.every(
+      (pathNode: string, idx: number) =>
+        activePath[idx] === pathNode
+    );
+  })
+  .map((e: any) => e.target);
+
+
+=======
+
+
+
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
+    if (isLeafNode(node.id)) {
+      // ... existing reverse traversal logic unchanged ...
+      setActiveReverseLeaf((prev) => {
+        const isSame = prev === node.id;
+        if (isSame) return null;
+
+        const reverseEdges = buildReverseEdges(node.id, visibleNodeIds);
+
+        setVisibleNodeIds((prevVisible: any) => {
+          const updated = new Set(prevVisible);
+          reverseEdges.forEach((e: any) => {
+            updated.add(e.source);
+            updated.add(e.target);
+          });
+
+          const visitedParents = new Set<string>();
+          const openParentsRecursively = (currentId: string) => {
+            if (visitedParents.has(currentId)) return;
+            visitedParents.add(currentId);
+
+            const parents = parentMap[currentId] || [];
+            parents.forEach((p: string) => {
+              updated.add(p);
+              const grandparents = parentMap[p] || [];
+              grandparents.forEach((gp: string) => {
+                updated.add(gp);
+              });
+              openParentsRecursively(p);
+            });
+          };
+
+          openParentsRecursively(node.id);
+          return updated;
+        });
+
+        return node.id;
+      });
+
+      return;
+    }
+
+    setActiveReverseLeaf(null);
+
+    const nodeData = nodeMap.get(node.id);
+    let currentDomain = selectedDomain;
+
+    const activePath = nodePaths[node.id] || [node.id];
+
+    if (nodeData.level === 0) {
+      currentDomain = nodeData.label;
+      setSelectedDomain(currentDomain);
+      setSelectedPath([node.id]);
+    } else {
+      setSelectedPath(activePath);
+    }
+
+    // ✅ FIX: Exact branch matching for shared nodes
+    let children = edgesData
+      .filter((e: any) => {
+        if (e.source !== node.id) return false;
+
+        // Exact length + content match
+        if (e.fullPath.length !== activePath.length) return false;
+
+        return e.fullPath.every(
+          (pathNode: string, idx: number) =>
+            activePath[idx] === pathNode
+        );
+      })
+      .map((e: any) => e.target);
+
+    // Level 1 domain filtering (unchanged)
+    if (nodeData.level === 1 && currentDomain) {
+      const filteredRows = rows.filter(
+        (r: any) =>
+          r.Domain === currentDomain &&
+          r.Geography === nodeData.label
+      );
+
+      const validDPs = new Set(
+        filteredRows.map((r: any) => r.DP_Disposition)
+      );
+
+      children = children.filter((childId: any) => {
+        const label = nodeMap.get(childId)?.label;
+        return validDPs.has(label);
+      });
+    }
+
+    // ... rest of setVisibleNodeIds logic remains exactly the same ...
+    setVisibleNodeIds((prev: any) => {
+      // ... unchanged ...
+    });
+
+    setActiveNode(node.id);
+  },
+  [childrenMap, nodeMap, nodesData, selectedDomain, rows, edgesData, nodePaths, parentMap, visibleNodeIds]
+);
+
+
+====
+
+
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
+    // ...
+  },
+  [
+    childrenMap,
+    nodeMap,
+    nodesData,
+    selectedDomain,
+    rows,
+    edgesData,      // ✅ add
+    nodePaths,      // ✅ add
+    parentMap,      // ✅ add
+    visibleNodeIds  // ✅ add
+  ]
+);
