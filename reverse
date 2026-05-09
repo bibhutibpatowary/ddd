@@ -1,31 +1,35 @@
-let prevNodeId: string | null = null;
+cleanData.forEach((raw: any) => {
+  let prevNodeId: string | null = null;
 
-const currentPath: string[] = [];
+  // 🔥 current hierarchy tracker
+  const currentPath: string[] = [];
 
-columns.forEach((col: string, level: number) => {
-  const value = String(row[col] || "").trim();
+  columns.forEach((col: string, level: number) => {
+    const value = String(raw[col] || "").trim();
 
-  if (!value) return;
+    if (!value) return;
 
-  const nodeId = `${level}::${value}`;
+    // 🔥 globally shared node
+    const nodeId = `${level}::${value}`;
 
-  addNode(nodeId, level);
+    addNode(nodeId, level);
 
-  const rootDomain = row[columns[0]];
+    const rootDomain = raw[columns[0]];
 
-  // 🔥 add current node into active hierarchy
-  currentPath.push(nodeId);
+    // 🔥 add node into active hierarchy
+    currentPath.push(nodeId);
 
-  if (prevNodeId) {
-    addEdge(
-      prevNodeId,
-      nodeId,
-      rootDomain,
+    if (prevNodeId) {
+      addEdge(
+        prevNodeId,
+        nodeId,
+        rootDomain,
 
-      // 🔥 store ONLY path up to SOURCE
-      [...currentPath.slice(0, -1)]
-    );
-  }
+        // 🔥 store path only till source node
+        [...currentPath.slice(0, -1)]
+      );
+    }
 
-  prevNodeId = nodeId;
+    prevNodeId = nodeId;
+  });
 });
