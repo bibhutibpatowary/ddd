@@ -1,64 +1,31 @@
-const pathStack: string[] = [];
+let prevNodeId: string | null = null;
 
+const currentPath: string[] = [];
 
-pathStack.push(nodeId);
+columns.forEach((col: string, level: number) => {
+  const value = String(row[col] || "").trim();
 
-if (prevNodeId) {
-  addEdge(
-    prevNodeId,
-    nodeId,
-    rootDomain,
-    [...pathStack]
-  );
-}
+  if (!value) return;
 
+  const nodeId = `${level}::${value}`;
 
+  addNode(nodeId, level);
 
-const addEdge = (
-  source: string,
-  target: string,
-  rootDomain: string,
-  fullPath: string[]
-) => {
+  const rootDomain = row[columns[0]];
 
+  // 🔥 add current node into active hierarchy
+  currentPath.push(nodeId);
 
-edgesSet.add(
-  JSON.stringify({
-    source,
-    target,
-    rootDomain,
-    fullPath
-  })
-);
+  if (prevNodeId) {
+    addEdge(
+      prevNodeId,
+      nodeId,
+      rootDomain,
 
+      // 🔥 store ONLY path up to SOURCE
+      [...currentPath.slice(0, -1)]
+    );
+  }
 
-
-return {
-  id: `e-${i}`,
-  source: parsed.source,
-  target: parsed.target,
-  rootDomain: parsed.rootDomain,
-  fullPath: parsed.fullPath
-};
-
-
-
-const currentPath = [...selectedPath];
-
-if (!currentPath.includes(node.id)) {
-  currentPath.push(node.id);
-}
-
-children =
-  edgesData
-    .filter((e: any) => {
-      if (e.source !== node.id) return false;
-
-      // 🔥 STRICT PATH MATCHING
-      return currentPath.every(
-        (pathNode, idx) =>
-          e.fullPath[idx] === pathNode
-      );
-    })
-    .map((e: any) => e.target);
-
+  prevNodeId = nodeId;
+});
