@@ -67,15 +67,11 @@ const onNodeClick = useCallback(
       setSelectedPath(activePath);
     }
 
-    // ✅ FIX: Exact branch matching for shared nodes
+    // Exact branch matching for shared nodes
     let children = edgesData
       .filter((e: any) => {
         if (e.source !== node.id) return false;
 
-        // Exact length + content match
-        // activePath includes the clicked node
-        // e.fullPath stores path UP TO (excluding) target
-        // So for this edge, e.fullPath should exactly equal activePath
         if (e.fullPath.length !== activePath.length) return false;
 
         return e.fullPath.every(
@@ -106,11 +102,13 @@ const onNodeClick = useCallback(
     setVisibleNodeIds((prev: any) => {
       const updated = new Set(prev);
 
-      const areChildrenVisible = children.every((c: any) =>
+      // ✅ Check if THIS node's children are visible (branch-aware)
+      const theseChildrenVisible = children.length > 0 && children.every((c: any) =>
         updated.has(c)
       );
 
-      if (areChildrenVisible) {
+      if (theseChildrenVisible) {
+        // ✅ COLLAPSE: Only remove descendants of THIS node
         const descendants = getAllDescendants(node.id, childrenMap);
 
         descendants.forEach((d: any) => updated.delete(d));
@@ -121,73 +119,18 @@ const onNodeClick = useCallback(
           return prev.slice(0, index + 1);
         });
 
-        descendants.forEach((d: any) => {
-          if (updated.has(d)) {
-            updated.delete(d);
-          }
+        // ✅ Clean up nodePaths for collapsed descendants
+        setNodePaths((prev: any) => {
+          const updatedPaths = { ...prev };
+          descendants.forEach((d: any) => {
+            delete updatedPaths[d];
+          });
+          return updatedPaths;
         });
 
         return updated;
       } else {
-        // Remove descendants of sibling branches first
-        const parentPath = activePath.slice(0, -1);
-
-        const siblingNodes = Array.from(updated).filter((visibleId: any) => {
-          const visiblePath = nodePaths[visibleId];
-
-          if (!visiblePath) return false;
-
-          const sameParent = parentPath.every(
-            (p: string, idx: number) => visiblePath[idx] === p
-          );
-
-          const sameLevel =
-            nodeMap.get(visibleId)?.level === nodeMap.get(node.id)?.level;
-
-          const notCurrent = visibleId !== node.id;
-
-          return sameParent && sameLevel && notCurrent;
-        });
-
-        // Remove sibling descendants
-        siblingNodes.forEach((siblingId: any) => {
-          const descendants = getAllDescendants(siblingId, childrenMap);
-
-          descendants.forEach((d: any) => {
-            updated.delete(d);
-          });
-        });
-
-        // Cleanup shared-node descendants from other branches
-        const currentNodePath = nodePaths[node.id] || [];
-
-        Array.from(updated).forEach((visibleId: any) => {
-          if (visibleId === node.id) return;
-
-          const visibleNode = nodeMap.get(visibleId);
-          const currentNode = nodeMap.get(node.id);
-
-          if (
-            visibleNode?.label === currentNode?.label &&
-            visibleNode?.level === currentNode?.level
-          ) {
-            const visiblePath = nodePaths[visibleId] || [];
-
-            const isDifferentBranch =
-              JSON.stringify(visiblePath.slice(0, -1)) !==
-              JSON.stringify(currentNodePath.slice(0, -1));
-
-            if (isDifferentBranch) {
-              const descendants = getAllDescendants(visibleId, childrenMap);
-
-              descendants.forEach((d: any) => {
-                updated.delete(d);
-              });
-            }
-          }
-        });
-
-        // Add current children
+        // ✅ EXPAND: Just add children, don't touch other branches
         children.forEach((c: any) => updated.add(c));
 
         setNodePaths((prev: any) => {
