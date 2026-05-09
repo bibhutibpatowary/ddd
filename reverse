@@ -1,18 +1,38 @@
-let activePath: string[] = [];
+const [nodePaths, setNodePaths] = useState<any>({});
 
-// 🔥 root node
-if (nodeData.level === 0) {
-  activePath = [node.id];
-} else {
-  // 🔥 find exact clicked branch
-  const matchedEdge: any = edgesData.find((e: any) => {
-    return (
-      e.target === node.id &&
-      visibleNodeIds.has(e.source)
-    );
+const initialPaths: any = {};
+
+roots.forEach((r: string) => {
+  initialPaths[r] = [r];
+});
+
+setNodePaths(initialPaths);
+
+
+
+
+=
+
+const activePath =
+  nodePaths[node.id] || [node.id];
+
+
+
+
+
+setNodePaths((prev: any) => {
+  const updatedPaths = { ...prev };
+
+  children.forEach((childId: string) => {
+    updatedPaths[childId] = [
+      ...activePath,
+      childId
+    ];
   });
 
-  activePath = matchedEdge
-    ? [...matchedEdge.fullPath, node.id]
-    : [node.id];
-}
+  return updatedPaths;
+});
+
+
+
+
