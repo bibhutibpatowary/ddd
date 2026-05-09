@@ -1,15 +1,47 @@
-let children =
-  edgesData
-    .filter((e: any) => {
-      if (e.source !== node.id) return false;
+setNodePaths((prev: any) => {
+  const updatedPaths = { ...prev };
 
-      // 🔥 compare ONLY till current node level
-      const edgePathTillCurrentNode =
-        e.fullPath.slice(0, activePath.length);
+  children.forEach((childId: string) => {
+    const newPath = [
+      ...activePath,
+      childId
+    ];
 
-      return edgePathTillCurrentNode.every(
-        (pathNode: string, idx: number) =>
-          activePath[idx] === pathNode
+    if (!updatedPaths[childId]) {
+      updatedPaths[childId] = [];
+    }
+
+    // 🔥 avoid duplicate path insertions
+    const alreadyExists =
+      updatedPaths[childId].some(
+        (p: string[]) =>
+          JSON.stringify(p) === JSON.stringify(newPath)
       );
-    })
-    .map((e: any) => e.target);
+
+    if (!alreadyExists) {
+      updatedPaths[childId].push(newPath);
+    }
+  });
+
+  return updatedPaths;
+});
+
+
+
+=======
+const availablePaths =
+  nodePaths[node.id] || [];
+
+const activePath =
+  availablePaths.find((p: string[]) => {
+    return selectedPath.every(
+      (nodeId: string, idx: number) =>
+        p[idx] === nodeId
+    );
+  }) || availablePaths[0] || [node.id];
+
+
+====
+
+
+
