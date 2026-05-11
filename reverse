@@ -1,63 +1,12 @@
-.map((e: any) => {
+const possiblePaths =
+  nodePaths[node.id] || [];
 
-  const isPathEdge = selectedPath.some(
-    (nodeId: any, index: number) =>
-      selectedPath[index + 1] === e.target &&
-      nodeId === e.source
-  );
+const activePath =
+  possiblePaths.find((path) => {
+    if (path.length === 1) return true;
 
-  // ✅ Create stable branch color from fullPath
-  const pathKey = JSON.stringify(
-    e.fullPath || []
-  );
+    const parentId =
+      path[path.length - 2];
 
-  let hash = 0;
-
-  for (let i = 0; i < pathKey.length; i++) {
-    hash =
-      pathKey.charCodeAt(i) +
-      ((hash << 5) - hash);
-  }
-
-  // Generate HSL color
-  const hue = Math.abs(hash % 360);
-
-  const branchColor =
-    `hsl(${hue}, 65%, 45%)`;
-
-  return {
-    ...e,
-    type: "smoothstep",
-
-    animated:
-      isPathEdge || e.isReverse,
-
-    ...(e.isReverse && {
-      markerStart: {
-        type: MarkerType.ArrowClosed,
-        color: "#007bff",
-        width: 20,
-        height: 20
-      }
-    }),
-
-    style: {
-      stroke: e.isReverse
-        ? "#007bff"
-        : isPathEdge
-          ? "red"
-          : branchColor,
-
-      strokeWidth: e.isReverse
-        ? 2.5
-        : isPathEdge
-          ? 3
-          : 1.8,
-
-      opacity: isPathEdge ? 1 : 0.55,
-
-      strokeDasharray:
-        e.isReverse ? "5 5" : "0"
-    }
-  };
-});
+    return visibleNodeIds.has(parentId);
+  }) || possiblePaths[0];
