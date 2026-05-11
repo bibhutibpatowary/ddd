@@ -335,16 +335,40 @@ export default function GraphFlow() {
           visibleNodeIds.has(e.target)
       )
       .map((e: any) => {
+
         const isPathEdge = selectedPath.some(
           (nodeId: any, index: number) =>
             selectedPath[index + 1] === e.target &&
             nodeId === e.source
         );
 
+        // ✅ Create stable branch color from fullPath
+        const pathKey = JSON.stringify(
+          e.fullPath || []
+        );
+
+        let hash = 0;
+
+        for (let i = 0; i < pathKey.length; i++) {
+          hash =
+            pathKey.charCodeAt(i) +
+            ((hash << 5) - hash);
+        }
+
+        // Generate HSL color
+        const hue = Math.abs(hash % 360);
+
+        const branchColor =
+          `hsl(${hue}, 65%, 45%)`;
+
         return {
           ...e,
-          type: "smoothstep",
-          animated: isPathEdge || e.isReverse,
+          type: "default",
+          pathOptions: {
+            curvature: 0.55
+          },
+          animated:
+            isPathEdge || e.isReverse,
 
           ...(e.isReverse && {
             markerStart: {
@@ -360,10 +384,18 @@ export default function GraphFlow() {
               ? "#007bff"
               : isPathEdge
                 ? "red"
-                : "#bbb",
+                : branchColor,
 
-            strokeWidth: e.isReverse ? 2 : isPathEdge ? 2.5 : 1,
-            strokeDasharray: e.isReverse ? "5 5" : "0"
+            strokeWidth: e.isReverse
+              ? 2.5
+              : isPathEdge
+                ? 3
+                : 1.8,
+
+            opacity: isPathEdge ? 1 : 0.55,
+
+            strokeDasharray:
+              e.isReverse ? "5 5" : "0"
           }
         };
       });
@@ -452,12 +484,18 @@ export default function GraphFlow() {
 
       let currentDomain = selectedDomain;
 
+      const possiblePaths =
+        nodePaths[node.id] || [];
+
       const activePath =
-        getActivePathForNode(
-          node.id,
-          selectedPath,
-          nodePaths
-        );
+        possiblePaths.find((path) => {
+          if (path.length === 1) return true;
+
+          const parentId =
+            path[path.length - 2];
+
+          return visibleNodeIds.has(parentId);
+        }) || possiblePaths[0];
 
       if (nodeData.level === 0) {
         currentDomain = nodeData.label;
@@ -520,13 +558,6 @@ export default function GraphFlow() {
           });
 
           // ✅ Clean up nodePaths for collapsed descendants
-          setNodePaths((prev: any) => {
-            const updatedPaths = { ...prev };
-            descendants.forEach((d: any) => {
-              delete updatedPaths[d];
-            });
-            return updatedPaths;
-          });
 
           return updated;
         } else {
