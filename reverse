@@ -1,12 +1,67 @@
-const possiblePaths =
-  nodePaths[node.id] || [];
+const getBranchDescendants = (
+  startNodeId: string,
+  activePath: string[],
+  edgesData: any[],
+  visited = new Set<string>()
+) => {
+  const children = edgesData
+    .filter((e) => {
+      if (e.source !== startNodeId) return false;
 
-const activePath =
-  possiblePaths.find((path) => {
-    if (path.length === 1) return true;
+      // strict branch match
+      if (
+        e.fullPath.length !== activePath.length
+      ) {
+        return false;
+      }
 
-    const parentId =
-      path[path.length - 2];
+      return e.fullPath.every(
+        (p: string, idx: number) =>
+          activePath[idx] === p
+      );
+    })
+    .map((e) => e.target);
 
-    return visibleNodeIds.has(parentId);
-  }) || possiblePaths[0];
+  children.forEach((childId) => {
+    if (!visited.has(childId)) {
+      visited.add(childId);
+
+      getBranchDescendants(
+        childId,
+        [...activePath, childId],
+        edgesData,
+        visited
+      );
+    }
+  });
+
+  return visited;
+};
+
+
+======
+
+const descendants =
+  getBranchDescendants(
+    node.id,
+    activePath,
+    edgesData
+  );
+
+descendants.forEach((d: any) => {
+
+  // Check if node still belongs to another visible branch
+  const paths =
+    nodePaths[d] || [];
+
+  const stillUsed =
+    paths.some((path) =>
+      path.some((p) =>
+        updated.has(p)
+      )
+    );
+
+  if (!stillUsed) {
+    updated.delete(d);
+  }
+});
