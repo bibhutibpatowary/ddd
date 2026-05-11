@@ -1,10 +1,10 @@
-const sortedEdges = [...edges].sort((a, b) => {
-  // stable ordering by source then target
-  const sourceCompare = a.source.localeCompare(b.source);
-
-  if (sourceCompare !== 0) {
-    return sourceCompare;
-  }
-
-  return a.target.localeCompare(b.target);
-});
+"#6C5CE7",
+"#00B894",
+"#D63031",
+"#0984E3",
+"#E17055",
+"#A29BFE",
+"#55EFC4",
+"#FD79A8",
+"#FDCB6E",
+"#636E72"
