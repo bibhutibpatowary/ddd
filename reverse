@@ -1,67 +1,55 @@
-const getBranchDescendants = (
-  startNodeId: string,
-  activePath: string[],
-  edgesData: any[],
-  visited = new Set<string>()
-) => {
-  const children = edgesData
-    .filter((e) => {
-      if (e.source !== startNodeId) return false;
+const [expandedPaths, setExpandedPaths] =
+  useState<Set<string>>(new Set());
 
-      // strict branch match
-      if (
-        e.fullPath.length !== activePath.length
-      ) {
-        return false;
-      }
+=====
 
-      return e.fullPath.every(
-        (p: string, idx: number) =>
-          activePath[idx] === p
-      );
-    })
-    .map((e) => e.target);
 
-  children.forEach((childId) => {
-    if (!visited.has(childId)) {
-      visited.add(childId);
+const currentBranchKey =
+  JSON.stringify(activePath);
 
-      getBranchDescendants(
-        childId,
-        [...activePath, childId],
-        edgesData,
-        visited
-      );
+
+==
+
+const isExpanded =
+  expandedPaths.has(currentBranchKey);
+
+if (isExpanded) {
+
+
+===
+
+setExpandedPaths((prev) => {
+  const next = new Set(prev);
+
+  Array.from(next).forEach((key) => {
+    if (key.startsWith(currentBranchKey)) {
+      next.delete(key);
     }
   });
 
-  return visited;
-};
-
-
-======
-
-const descendants =
-  getBranchDescendants(
-    node.id,
-    activePath,
-    edgesData
-  );
-
-descendants.forEach((d: any) => {
-
-  // Check if node still belongs to another visible branch
-  const paths =
-    nodePaths[d] || [];
-
-  const stillUsed =
-    paths.some((path) =>
-      path.some((p) =>
-        updated.has(p)
-      )
-    );
-
-  if (!stillUsed) {
-    updated.delete(d);
-  }
+  return next;
 });
+
+===
+
+
+setExpandedPaths((prev) => {
+  const next = new Set(prev);
+
+  next.add(currentBranchKey);
+
+  children.forEach((childId: string) => {
+    next.add(
+      JSON.stringify([
+        ...activePath,
+        childId
+      ])
+    );
+  });
+
+  return next;
+});
+
+
+==
+
