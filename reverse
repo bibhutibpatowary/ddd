@@ -1,54 +1,253 @@
-const [expandedPaths, setExpandedPaths] =
-  useState<Set<string>>(new Set());
+const [activeNodePath, setActiveNodePath] = useState<string[]>([]);
+
 
 =====
 
+const pathsEqual = (a: string[] = [], b: string[] = []) => {
+  if (a.length !== b.length) return false;
 
-const currentBranchKey =
-  JSON.stringify(activePath);
+  return a.every((nodeId, index) => nodeId === b[index]);
+};
+
+const isPrefixPath = (prefix: string[] = [], full: string[] = []) => {
+  if (prefix.length > full.length) return false;
+
+  return prefix.every((nodeId, index) => nodeId === full[index]);
+};
+
+const getBestPathForClickedNode = (
+  nodeId: string,
+  selectedPath: string[],
+  activeNodePath: string[],
+  nodePaths: Record<string, string[][]>
+) => {
+  const possiblePaths = nodePaths[nodeId] || [];
+
+  if (possiblePaths.length === 0) {
+    return [nodeId];
+  }
+
+  // 1. If currently selected path ends at this node, reuse it.
+  // This is important when clicking a shared node again to collapse/expand.
+  const selectedMatch = possiblePaths.find((path) =>
+    pathsEqual(path, selectedPath)
+  );
+
+  if (selectedMatch) {
+    return selectedMatch;
+  }
+
+  // 2. If previous active node path is parent of this clicked node,
+  // use the child path under that active branch.
+  const fromActiveParent = possiblePaths.find((path) => {
+    const parentPath = path.slice(0, -1);
+    return pathsEqual(parentPath, activeNodePath);
+  });
+
+  if (fromActiveParent) {
+    return fromActiveParent;
+  }
+
+  // 3. If selected path is parent of this clicked node, use that branch.
+  const fromSelectedParent = possiblePaths.find((path) => {
+    const parentPath = path.slice(0, -1);
+    return pathsEqual(parentPath, selectedPath);
+  });
+
+  if (fromSelectedParent) {
+    return fromSelectedParent;
+  }
+
+  // 4. If clicked node is inside the selected path, use that prefix.
+  const selectedPrefix = possiblePaths.find((path) =>
+    isPrefixPath(path, selectedPath)
+  );
+
+  if (selectedPrefix) {
+    return selectedPrefix;
+  }
+
+  // 5. Prefer a path whose parent is visible, but only as fallback.
+  const visibleParentMatch = possiblePaths.find((path) => {
+    if (path.length === 1) return true;
+
+    const parentId = path[path.length - 2];
+    return visibleNodeIds.has(parentId);
+  });
+
+  return visibleParentMatch || possiblePaths[0] || [nodeId];
+};
 
 
 ==
 
-const isExpanded =
-  expandedPaths.has(currentBranchKey);
-
-if (isExpanded) {
-
-
-===
-
-setExpandedPaths((prev) => {
-  const next = new Set(prev);
-
-  Array.from(next).forEach((key) => {
-    if (key.startsWith(currentBranchKey)) {
-      next.delete(key);
-    }
-  });
-
-  return next;
-});
-
-===
-
-
-setExpandedPaths((prev) => {
-  const next = new Set(prev);
-
-  next.add(currentBranchKey);
-
-  children.forEach((childId: string) => {
-    next.add(
-      JSON.stringify([
-        ...activePath,
-        childId
-      ])
+const onNodeClick = useCallback(
+  (_: any, node: any) => {
+    const clickedPath = getBestPathForClickedNode(
+      node.id,
+      selectedPath,
+      activeNodePath,
+      nodePaths
     );
-  });
 
-  return next;
-});
+    if (isLeafNode(node.id)) {
+      setActiveReverseLeaf((prev) => {
+        const isSame = prev === node.id;
+
+        if (isSame) {
+          return null;
+        }
+
+        const leafPaths = nodePaths[node.id] || [];
+
+        setVisibleNodeIds((prevVisible: any) => {
+          const updated = new Set(prevVisible);
+
+          leafPaths.forEach((path) => {
+            path.forEach((nodeId) => {
+              updated.add(nodeId);
+            });
+          });
+
+          return updated;
+        });
+
+        setSelectedPath(clickedPath);
+        setActiveNodePath(clickedPath);
+
+        return node.id;
+      });
+
+      return;
+    }
+
+    setActiveReverseLeaf(null);
+
+    const nodeData = nodeMap.get(node.id);
+
+    if (!nodeData) return;
+
+    let currentDomain = selectedDomain;
+
+    const activePath = clickedPath;
+
+    if (nodeData.level === 0) {
+      currentDomain = nodeData.label;
+      setSelectedDomain(currentDomain);
+      setSelectedPath([node.id]);
+      setActiveNodePath([node.id]);
+    } else {
+      setSelectedPath(activePath);
+      setActiveNodePath(activePath);
+    }
+
+    let children = edgesData
+      .filter((e: any) => {
+        if (e.source !== node.id) return false;
+
+        if (e.fullPath.length !== activePath.length) {
+          return false;
+        }
+
+        return e.fullPath.every(
+          (pathNode: string, idx: number) =>
+            activePath[idx] === pathNode
+        );
+      })
+      .map((e: any) => e.target);
+
+    if (nodeData.level === 1 && currentDomain) {
+      const filteredRows = rows.filter(
+        (r: any) =>
+          r.Domain === currentDomain &&
+          r.Geography === nodeData.label
+      );
+
+      const validDPs = new Set(
+        filteredRows.map((r: any) => r.DP_Disposition)
+      );
+
+      children = children.filter((childId: any) => {
+        const label = nodeMap.get(childId)?.label;
+        return validDPs.has(label);
+      });
+    }
+
+    setVisibleNodeIds((prev: any) => {
+      const updated = new Set(prev);
+
+      const theseChildrenVisible =
+        children.length > 0 &&
+        children.every((c: any) => updated.has(c));
+
+      if (theseChildrenVisible) {
+        const descendants = getAllDescendants(node.id, childrenMap);
+
+        descendants.forEach((d: any) => {
+          updated.delete(d);
+        });
+
+        nodesData.forEach((n: any) => {
+          if (n.level === 0) updated.add(n.id);
+        });
+
+        setSelectedPath((prev: any) => {
+          const index = prev.indexOf(node.id);
+          if (index === -1) return prev;
+          return prev.slice(0, index + 1);
+        });
+
+        setActiveNodePath(activePath);
+
+        return updated;
+      }
+
+      children.forEach((c: any) => {
+        updated.add(c);
+      });
+
+      nodesData.forEach((n: any) => {
+        if (n.level === 0) updated.add(n.id);
+      });
+
+      return updated;
+    });
+
+    setActiveNode(node.id);
+  },
+  [
+    selectedPath,
+    activeNodePath,
+    childrenMap,
+    nodeMap,
+    nodesData,
+    selectedDomain,
+    rows,
+    edgesData,
+    nodePaths,
+    visibleNodeIds
+  ]
+);
+
+
+
+===
+
+const resetGraph = () => {
+  const roots = nodesData
+    .filter((n: any) => n.level === 0)
+    .map((n: any) => n.id);
+
+  setVisibleNodeIds(new Set(roots));
+  setSelectedPath([]);
+  setActiveNodePath([]);
+  setActiveNode(null);
+  setSelectedDomain(null);
+  setActiveReverseLeaf(null);
+};
+
+
+===
 
 
 ==
