@@ -1,65 +1,52 @@
-const getBestPathForClickedNode = (
-  nodeId: string,
-  selectedPath: string[],
-  activeRootId: string | null,
-  nodePaths: Record<string, string[][]>
-) => {
-  const possiblePaths = nodePaths[nodeId] || [];
+const hasReverseFocus = !!activeReverseLeaf;
 
-  if (possiblePaths.length === 0) {
-    return [nodeId];
-  }
+const edgeOpacity = e.isReverse
+  ? 1
+  : hasReverseFocus
+    ? 0.12
+    : isPathEdge
+      ? 1
+      : 0.55;
 
-  // 1. EXACT MATCH
-  const exactMatch = possiblePaths.find((path) =>
-    pathsEqual(path, selectedPath)
-  );
+style: {
+  stroke: e.isReverse
+    ? "#007bff"
+    : isPathEdge
+      ? "red"
+      : branchColor,
 
-  if (exactMatch) {
-    return exactMatch;
-  }
+  strokeWidth: e.isReverse
+    ? 3.5
+    : isPathEdge
+      ? 3
+      : 1.8,
 
-  // 2. STRONGEST PREFIX MATCH
-  // This is the REAL fix
-  let bestMatch: string[] | null = null;
-  let bestScore = -1;
+  opacity: edgeOpacity,
 
-  possiblePaths.forEach((path) => {
-    let score = 0;
+  strokeDasharray: e.isReverse
+    ? "5 5"
+    : "0",
 
-    for (
-      let i = 0;
-      i < Math.min(path.length, selectedPath.length);
-      i++
-    ) {
-      if (path[i] === selectedPath[i]) {
-        score++;
-      } else {
-        break;
-      }
-    }
+  transition: "all 0.25s ease"
+}
 
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = path;
-    }
-  });
 
-  if (bestMatch) {
-    return bestMatch;
-  }
 
-  // 3. ROOT FALLBACK
-  if (activeRootId) {
-    const rootMatch = possiblePaths.find(
-      (path) => path[0] === activeRootId
-    );
 
-    if (rootMatch) {
-      return rootMatch;
-    }
-  }
+=====
 
-  // 4. DEFAULT
-  return possiblePaths[0];
-};
+const hasReverseFocus = !!activeReverseLeaf;
+
+const isInReversePath =
+  selectedPath.includes(id);
+
+
+
+
+
+opacity:
+  hasReverseFocus
+    ? isInReversePath
+      ? 1
+      : 0.25
+    : 1
