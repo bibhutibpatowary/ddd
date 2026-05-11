@@ -1,25 +1,10 @@
-const reverseHighlightedNodes = new Set<string>();
+const sortedEdges = [...edges].sort((a, b) => {
+  // stable ordering by source then target
+  const sourceCompare = a.source.localeCompare(b.source);
 
-if (activeReverseLeaf) {
-  const leafPaths = nodePaths[activeReverseLeaf] || [];
+  if (sourceCompare !== 0) {
+    return sourceCompare;
+  }
 
-  leafPaths.forEach((path) => {
-    path.forEach((nodeId) => {
-      reverseHighlightedNodes.add(nodeId);
-    });
-  });
-}
-
-=====
-
-const hasReverseFocus = !!activeReverseLeaf;
-
-const isInReversePath =
-  reverseHighlightedNodes.has(id);
-
-opacity:
-  hasReverseFocus
-    ? isInReversePath
-      ? 1
-      : 0.2
-    : 1
+  return a.target.localeCompare(b.target);
+});
