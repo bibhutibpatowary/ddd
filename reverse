@@ -1,12 +1,477 @@
-const [activeRootId, setActiveRootId] = useState<string | null>(null);
+import React, { useState, useMemo, useCallback } from "react";
+import ReactFlow, { Background, Controls, Position, MarkerType } from "reactflow";
+import dagre from "dagre";
+import * as XLSX from "xlsx";
+import "reactflow/dist/style.css";
+import { Button, Col, Input, Row } from "antd";
 
 
-====
+const COLORS = [
+  "#4A90E2",
+  "#9B59B6",
+  "#F39C12",
+  "#1ABC9C",
+  "#2ECC71",
+  "#E67E22",
+  "#F1C40F",
+  "#95A5A6",
+  "#E84393",
+  "#00CEC9"
+];
 
-const pathsEqual = (a: string[] = [], b: string[] = []) => {
+const normalizeRow = (row: any) => {
+  const newRow: any = {};
+  Object.keys(row).forEach((key) => {
+    const cleanKey = key.trim().replace(/\s+/g, "_");
+    newRow[cleanKey] = row[key];
+  });
+  return newRow;
+};
+
+const getLayoutedElements = (nodes: any, edges: any) => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  dagreGraph.setGraph({
+    rankdir: "LR",
+    nodesep: 80,
+    ranksep: 150
+  });
+
+  nodes.forEach((node: any) => {
+    dagreGraph.setNode(node.id, { width: 150, height: 50 });
+  });
+
+  edges.forEach((edge: any) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  return {
+    nodes: nodes.map((node: any) => {
+      const pos = dagreGraph.node(node.id);
+      return {
+        ...node,
+        position: { x: pos.x, y: pos.y }
+      };
+    }),
+    edges
+  };
+};
+
+export default function GraphFlow() {
+  const [nodesData, setNodesData] = useState([]);
+  const [edgesData, setEdgesData] = useState([]);
+  const [selectedDomain, setSelectedDomain] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [selectedPath, setSelectedPath] = useState<any>([]);
+  const [nodePaths, setNodePaths] = useState<
+    Record<string, string[][]>
+  >({});
+  const [activeNodePath, setActiveNodePath] = useState<string[]>([]);
+
+  const [visibleNodeIds, setVisibleNodeIds] = useState<any>(new Set());
+  const [activeNode, setActiveNode] = useState(null);
+  const [activeReverseLeaf, setActiveReverseLeaf] = useState<string | null>(null);
+  const [activeRootId, setActiveRootId] = useState<string | null>(null);
+
+  const handleUpload = (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const workbook = XLSX.read(event.target?.result, {
+        type: "binary"
+      });
+
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      const cleanData: any = rawData.map((row) => normalizeRow(row));
+
+
+      const nodesMap = new Map();
+      const edgesSet = new Set();
+
+      const columns: string[] = Object.keys(cleanData[0] || {});
+
+      const addNode = (id: string, level: number) => {
+        if (!nodesMap.has(id)) {
+          nodesMap.set(id, {
+            id,
+            label: id.split("::")[1] || "Unknown",
+            level
+          });
+        }
+      };
+
+      const allNodePaths: Record<string, string[][]> = {};
+
+      const addEdge = (
+        source: string,
+        target: string,
+        rootDomain: string,
+        fullPath: string[]
+      ) => {
+        edgesSet.add(
+          JSON.stringify({
+            source,
+            target,
+            rootDomain,
+            fullPath
+          })
+        );
+      };
+
+      cleanData.forEach((raw: any) => {
+        let prevNodeId: string | null = null;
+
+        // 🔥 current hierarchy tracker
+        const currentPath: string[] = [];
+
+        columns.forEach((col: string, level: number) => {
+          const value = String(raw[col] || "").trim();
+
+          if (!value) return;
+
+          // 🔥 globally shared node
+          const nodeId = `${level}::${value}`;
+
+          addNode(nodeId, level);
+
+          const rootDomain = raw[columns[0]];
+
+          // 🔥 add node into active hierarchy
+          currentPath.push(nodeId);
+
+          const existingPaths =
+            allNodePaths[nodeId] || [];
+
+          const newPath = [...currentPath];
+
+          const alreadyExists =
+            existingPaths.some(
+              (p) =>
+                JSON.stringify(p) ===
+                JSON.stringify(newPath)
+            );
+
+          if (!alreadyExists) {
+            allNodePaths[nodeId] = [
+              ...existingPaths,
+              newPath
+            ];
+          }
+
+          if (prevNodeId) {
+            addEdge(
+              prevNodeId,
+              nodeId,
+              rootDomain,
+
+              // 🔥 store path only till source node
+              [...currentPath.slice(0, -1)]
+            );
+          }
+
+          prevNodeId = nodeId;
+        });
+      });
+
+      setRows(cleanData);
+
+      const nodesArr: any = Array.from(nodesMap.values());
+      const edgesArr: any = Array.from(edgesSet).map((e: any, i) => {
+        const parsed = JSON.parse(e);
+
+        return {
+          id: `e-${i}`,
+          source: parsed.source,
+          target: parsed.target,
+          rootDomain: parsed.rootDomain,
+          fullPath: parsed.fullPath
+        };
+      });
+
+      setNodesData(nodesArr);
+      setEdgesData(edgesArr);
+      const roots = nodesArr.filter((n: any) => n.level === 0).map((n: any) => n.id);
+
+
+      setNodePaths(allNodePaths);
+      setVisibleNodeIds(new Set(roots));
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  const nodeMap = useMemo(() => {
+    return new Map(nodesData.map((n: any) => [n.id, n]));
+  }, [nodesData]);
+
+  const { childrenMap, parentMap } = useMemo(() => {
+    const children: any = {};
+    const parents: any = {};
+
+    edgesData.forEach(({ source, target }) => {
+      if (!children[source]) children[source] = [];
+      if (!parents[target]) parents[target] = [];
+
+      children[source].push(target);
+      parents[target].push(source);
+    });
+
+    return { childrenMap: children, parentMap: parents };
+  }, [edgesData]);
+
+  const isLeafNode = (nodeId: any) => {
+    return !childrenMap[nodeId] || childrenMap[nodeId].length === 0;
+  }
+
+  const buildReverseEdges = (
+    startNodeId: string,
+    allowedNodes: Set<string>,
+    allBranchPaths: string[][]
+  ) => {
+    const visitedEdges = new Set<string>();
+
+    const edges: {
+      source: string;
+      target: string;
+    }[] = [];
+
+    allBranchPaths.forEach((branchPath) => {
+      // reverse traverse path
+      for (
+        let i = branchPath.length - 1;
+        i > 0;
+        i--
+      ) {
+        const child = branchPath[i];
+        const parent = branchPath[i - 1];
+
+        const edgeKey =
+          `${parent}->${child}`;
+
+        if (visitedEdges.has(edgeKey)) {
+          continue;
+        }
+
+        visitedEdges.add(edgeKey);
+
+        edges.push({
+          source: parent,
+          target: child
+        });
+      }
+    });
+
+    return edges;
+  };
+
+  const baseNodes = useMemo(() => {
+    return Array.from(visibleNodeIds).map((id) => {
+      const node = nodeMap.get(id);
+      const level = node?.level;
+
+      const isActive = id === activeNode;
+      const isInPath = selectedPath.includes(id);
+
+      const baseColor = COLORS[level % COLORS.length];
+
+      return {
+        id,
+        data: { label: node?.label },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        style: {
+          padding: 10,
+          borderRadius: 8,
+
+          border: isInPath
+            ? "3px solid red"
+            : isActive
+              ? "2px solid #000"
+              : `1px solid ${baseColor}`,
+          background: baseColor,
+
+          color: "#fff",
+
+          opacity: 1
+        }
+      };
+    });
+  }, [visibleNodeIds, activeNode, selectedPath, nodeMap, childrenMap]);
+
+  const edges = useMemo(() => {
+    let finalEdges: any[] = [...edgesData];
+
+    // Add reverse edges if leaf selected
+    if (activeReverseLeaf) {
+      // ✅ Get branch path for the active reverse leaf
+      const leafPaths =
+        nodePaths[activeReverseLeaf] || [];
+
+      const reverseEdges =
+        buildReverseEdges(
+          activeReverseLeaf,
+          visibleNodeIds,
+          leafPaths
+        ).map((e, i) => ({
+          id: `rev-${activeReverseLeaf}-${i}`,
+          source: e.source,
+          target: e.target,
+          isReverse: true
+        }));
+
+      finalEdges = [...finalEdges, ...reverseEdges];
+    }
+
+    return finalEdges
+      .filter(
+        (e: any) =>
+          visibleNodeIds.has(e.source) &&
+          visibleNodeIds.has(e.target)
+      )
+      .map((e: any) => {
+
+        const isPathEdge =
+  selectedPath.length > 1 &&
+  selectedPath.some((nodeId: any, index: number) => {
+    const nextNode = selectedPath[index + 1];
+
+    if (!nextNode) return false;
+
+    const edgeMatchesNodes =
+      nodeId === e.source && nextNode === e.target;
+
+    if (!edgeMatchesNodes) return false;
+
+    const expectedFullPath = selectedPath.slice(0, index + 1);
+
+    if (!e.fullPath) return false;
+
+    if (e.fullPath.length !== expectedFullPath.length) {
+      return false;
+    }
+
+    return e.fullPath.every(
+      (pathNode: string, idx: number) =>
+        pathNode === expectedFullPath[idx]
+    );
+  });
+
+        // ✅ Create stable branch color from fullPath
+        const pathKey = JSON.stringify(
+          e.fullPath || []
+        );
+
+        let hash = 0;
+
+        for (let i = 0; i < pathKey.length; i++) {
+          hash =
+            pathKey.charCodeAt(i) +
+            ((hash << 5) - hash);
+        }
+
+        // Generate HSL color
+        const hue = Math.abs(hash % 360);
+
+        const branchColor =
+          `hsl(${hue}, 65%, 45%)`;
+
+        return {
+          ...e,
+          type: "default",
+          pathOptions: {
+            curvature: 0.55
+          },
+          animated:
+            isPathEdge || e.isReverse,
+
+          ...(e.isReverse && {
+            markerStart: {
+              type: MarkerType.ArrowClosed,
+              color: "#007bff",
+              width: 20,
+              height: 20
+            }
+          }),
+
+          style: {
+            stroke: e.isReverse
+              ? "#007bff"
+              : isPathEdge
+                ? "red"
+                : branchColor,
+
+            strokeWidth: e.isReverse
+              ? 2.5
+              : isPathEdge
+                ? 3
+                : 1.8,
+
+            opacity: isPathEdge ? 1 : 0.55,
+
+            strokeDasharray:
+              e.isReverse ? "5 5" : "0"
+          }
+        };
+      });
+  }, [edgesData, visibleNodeIds, selectedPath, activeReverseLeaf, nodePaths]);
+
+  const { nodes } = useMemo(() => {
+    return getLayoutedElements(baseNodes, edges);
+  }, [baseNodes, edges]);
+
+  const getAllDescendants = (
+    nodeId: any,
+    childrenMap: any,
+    visited = new Set()
+  ) => {
+    const children = childrenMap[nodeId] || [];
+
+    children.forEach((child: any) => {
+      if (!visited.has(child)) {
+        visited.add(child);
+        getAllDescendants(child, childrenMap, visited);
+      }
+    });
+
+    return visited;
+  };
+
+  const getActivePathForNode = (
+    nodeId: string,
+    selectedPath: string[],
+    nodePaths: Record<string, string[][]>
+  ) => {
+    const paths = nodePaths[nodeId] || [];
+
+    // exact selected branch match
+    const matched = paths.find((p) =>
+      selectedPath.every(
+        (node, idx) => p[idx] === node
+      )
+    );
+
+    // fallback
+    return matched || paths[0] || [nodeId];
+  };
+
+  const pathsEqual = (a: string[] = [], b: string[] = []) => {
   if (a.length !== b.length) return false;
 
   return a.every((nodeId, index) => nodeId === b[index]);
+};
+
+const isPrefixPath = (prefix: string[] = [], full: string[] = []) => {
+  if (prefix.length > full.length) return false;
+
+  return prefix.every((nodeId, index) => nodeId === full[index]);
 };
 
 const getBestPathForClickedNode = (
@@ -57,12 +522,7 @@ const getBestPathForClickedNode = (
   return possiblePaths[0];
 };
 
-
-
-======
-
-
-const onNodeClick = useCallback(
+  const onNodeClick = useCallback(
   (_: any, node: any) => {
     const nodeData = nodeMap.get(node.id);
 
@@ -210,10 +670,6 @@ const onNodeClick = useCallback(
   ]
 );
 
-
-
-========
-
 const resetGraph = () => {
   const roots = nodesData
     .filter((n: any) => n.level === 0)
@@ -227,31 +683,19 @@ const resetGraph = () => {
   setActiveRootId(null);
 };
 
+  return (
+    <div style={{ width: "100%", height: "600px" }}>
+      <Row style={{ padding: "15px" }}>
+        <Col span={4}>
+          <Input type="file" onChange={handleUpload} />
+        </Col>
+        <Button type="primary" style={{ marginLeft: '10px' }} onClick={resetGraph}>Reset Selection</Button>
+      </Row>
+      <ReactFlow nodes={nodes} edges={edges} minZoom={0.1} onNodeClick={onNodeClick} fitView>
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
 
-======
-
-const isPathEdge =
-  selectedPath.length > 1 &&
-  selectedPath.some((nodeId: any, index: number) => {
-    const nextNode = selectedPath[index + 1];
-
-    if (!nextNode) return false;
-
-    const edgeMatchesNodes =
-      nodeId === e.source && nextNode === e.target;
-
-    if (!edgeMatchesNodes) return false;
-
-    const expectedFullPath = selectedPath.slice(0, index + 1);
-
-    if (!e.fullPath) return false;
-
-    if (e.fullPath.length !== expectedFullPath.length) {
-      return false;
-    }
-
-    return e.fullPath.every(
-      (pathNode: string, idx: number) =>
-        pathNode === expectedFullPath[idx]
-    );
-  });
