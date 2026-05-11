@@ -1,52 +1,25 @@
-const hasReverseFocus = !!activeReverseLeaf;
+const reverseHighlightedNodes = new Set<string>();
 
-const edgeOpacity = e.isReverse
-  ? 1
-  : hasReverseFocus
-    ? 0.12
-    : isPathEdge
-      ? 1
-      : 0.55;
+if (activeReverseLeaf) {
+  const leafPaths = nodePaths[activeReverseLeaf] || [];
 
-style: {
-  stroke: e.isReverse
-    ? "#007bff"
-    : isPathEdge
-      ? "red"
-      : branchColor,
-
-  strokeWidth: e.isReverse
-    ? 3.5
-    : isPathEdge
-      ? 3
-      : 1.8,
-
-  opacity: edgeOpacity,
-
-  strokeDasharray: e.isReverse
-    ? "5 5"
-    : "0",
-
-  transition: "all 0.25s ease"
+  leafPaths.forEach((path) => {
+    path.forEach((nodeId) => {
+      reverseHighlightedNodes.add(nodeId);
+    });
+  });
 }
-
-
-
 
 =====
 
 const hasReverseFocus = !!activeReverseLeaf;
 
 const isInReversePath =
-  selectedPath.includes(id);
-
-
-
-
+  reverseHighlightedNodes.has(id);
 
 opacity:
   hasReverseFocus
     ? isInReversePath
       ? 1
-      : 0.25
+      : 0.2
     : 1
